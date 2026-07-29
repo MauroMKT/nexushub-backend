@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
+from ..notifications import notify_user
 
 router = APIRouter(prefix="/tasks", tags=["Reminder & Task"])
 
@@ -22,10 +23,21 @@ def list_tasks(done: bool = None, db: Session = Depends(get_db), user: models.Us
 @router.post("", response_model=schemas.TaskOut)
 def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db),
                  user: models.User = Depends(get_current_user)):
-    task = models.Task(tenant_id=user.tenant_id, assigned_user_id=user.id, **payload.dict())
+    data = payload.dict()
+    assigned_user_id = data.pop("assigned_user_id", None) or user.id
+    task = models.Task(tenant_id=user.tenant_id, assigned_user_id=assigned_user_id, **data)
     db.add(task)
     db.commit()
     db.refresh(task)
+
+    if assigned_user_id != user.id:
+        assignee = db.query(models.User).filter(
+            models.User.id == assigned_user_id, models.User.tenant_id == user.tenant_id
+        ).first()
+        if assignee:
+            notify_user(db, assignee, "Nuovo task assegnato", f'{user.full_name} ti ha assegnato: "{task.title}"',
+                        related_type="task", related_id=task.id)
+
     return task
 
 

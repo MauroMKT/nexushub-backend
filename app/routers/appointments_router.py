@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..auth import get_current_user
+from ..automation_engine import run_automation
 from ..database import get_db
 
 router = APIRouter(prefix="/appointments", tags=["Agenda & Appuntamenti"])
@@ -32,6 +33,13 @@ def create_appointment(payload: schemas.AppointmentCreate, db: Session = Depends
     db.add(appt)
     db.commit()
     db.refresh(appt)
+
+    client = db.query(models.Client).filter(models.Client.id == appt.client_id).first() if appt.client_id else None
+    run_automation(db, user.tenant_id, "appointment_created", {
+        "appointment_id": appt.id, "client_id": appt.client_id,
+        "client_name": client.name if client else "", "owner_user_id": user.id,
+    })
+
     return appt
 
 

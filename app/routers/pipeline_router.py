@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..auth import get_current_user
+from ..automation_engine import run_automation
 from ..database import get_db
 
 router = APIRouter(prefix="/pipeline", tags=["CRM Core - Pipeline"])
@@ -45,4 +46,13 @@ def move_deal(deal_id: str, payload: schemas.DealMove, db: Session = Depends(get
     deal.stage_id = payload.stage_id
     db.commit()
     db.refresh(deal)
+
+    stage = db.query(models.PipelineStage).filter(models.PipelineStage.id == deal.stage_id).first()
+    client = db.query(models.Client).filter(models.Client.id == deal.client_id).first()
+    run_automation(db, user.tenant_id, "stage_change", {
+        "deal_id": deal.id, "client_id": deal.client_id,
+        "client_name": client.name if client else "",
+        "stage_name": stage.name if stage else "", "owner_user_id": user.id,
+    })
+
     return deal

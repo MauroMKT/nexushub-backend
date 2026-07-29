@@ -14,6 +14,9 @@ from .database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# Token del portale clienti: stesso schema OAuth2 ma con tokenUrl dedicato e claim "portal": true,
+# così un token del portale non può essere usato per autenticarsi come membro del team e viceversa.
+portal_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/portal/login", auto_error=False)
 
 
 def _truncate_to_bcrypt_limit(password: str) -> str:
@@ -58,10 +61,50 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None or not user.is_active:
         raise credentials_exception
+    # Un'azienda sospesa dal super admin perde l'accesso per tutti i suoi membri
+    # (il super admin stesso vive nel tenant interno "_platform", sempre attivo).
+    if user.role != models.RoleEnum.platform_admin:
+        tenant = db.query(models.Tenant).filter(models.Tenant.id == user.tenant_id).first()
+        if tenant is None or not tenant.is_active:
+            raise HTTPException(status_code=403, detail="Account sospeso: contatta l'assistenza")
     return user
 
 
 def require_admin(user: models.User = Depends(get_current_user)) -> models.User:
-    if user.role != models.RoleEnum.admin:
+    if user.role not in (models.RoleEnum.admin, models.RoleEnum.platform_admin):
         raise HTTPException(status_code=403, detail="Operazione riservata agli amministratori del tenant")
     return user
+
+
+def require_platform_admin(user: models.User = Depends(get_current_user)) -> models.User:
+    """Unica eccezione consapevole all'isolamento tenant_id: il super admin può
+    leggere/agire su tutti i tenant tramite gli endpoint dedicati in platform_admin_router."""
+    if user.role != models.RoleEnum.platform_admin:
+        raise HTTPException(status_code=403, detail="Operazione riservata al super admin della piattaforma")
+    return user
+
+
+def get_current_portal_client(token: str = Depends(portal_oauth2_scheme), db: Session = Depends(get_db)) -> models.Client:
+    """Dipendenza equivalente a get_current_user ma per i login del portale clienti (M19).
+    Il claim 'portal': true impedisce che un token del team venga riusato qui o viceversa."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sessione del portale non valida",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if not token:
+        raise credentials_exception
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        if not payload.get("portal"):
+            raise credentials_exception
+        client_id: str = payload.get("client_id")
+        if client_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    client = db.query(models.Client).filter(models.Client.id == client_id).first()
+    if client is None:
+        raise credentials_exception
+    return client

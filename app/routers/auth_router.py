@@ -7,8 +7,17 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import create_access_token, get_current_user, hash_password, verify_password
 from ..database import get_db
+from ..vat_utils import detect_vat_country
 
 router = APIRouter(prefix="/auth", tags=["Autenticazione"])
+
+
+@router.get("/vat-lookup", response_model=schemas.VatCountryInfo)
+def vat_lookup(vat_number: str):
+    """Riconosce il paese di una Partita IVA dal formato (nessuna chiamata VIES esterna).
+    Usato dal form di registrazione per mostrare subito il paese rilevato e decidere
+    se mostrare il campo PEC (solo aziende italiane)."""
+    return detect_vat_country(vat_number)
 
 
 def slugify(name: str) -> str:
@@ -19,15 +28,36 @@ def slugify(name: str) -> str:
 DEFAULT_PIPELINE_STAGES = ["Nuovo Lead", "Contattato", "Proposta Inviata", "Trattativa", "Vinto", "Perso"]
 
 
+VALID_COMPANY_TYPES = {"spa", "srl", "srls", "ditta_individuale", "libero_professionista"}
+
+
 @router.post("/register", response_model=schemas.Token)
 def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_db)):
     """Crea una nuova azienda cliente (tenant) con il primo utente amministratore.
-    Corrisponde al wizard di onboarding descritto in Sezione 5.2 del documento."""
+    Supporta due tipi di registrazione: "azienda" (con dati societari, P.IVA, PEC)
+    e "persona fisica" (solo anagrafica individuale)."""
     existing = db.query(models.User).filter(models.User.email == payload.admin_email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email già registrata")
 
-    base_slug = slugify(payload.company_name)
+    account_type = payload.account_type if payload.account_type in ("azienda", "persona_fisica") else "azienda"
+
+    vat_country_code = None
+    if account_type == "azienda":
+        if not payload.legal_name:
+            raise HTTPException(status_code=400, detail="La ragione sociale è obbligatoria per un account azienda")
+        if not payload.company_type or payload.company_type not in VALID_COMPANY_TYPES:
+            raise HTTPException(status_code=400, detail="Tipo di azienda non valido")
+        display_name = payload.legal_name
+        if payload.vat_number:
+            vat_info = detect_vat_country(payload.vat_number)
+            vat_country_code = vat_info["country_code"]
+    else:
+        if not payload.full_name:
+            raise HTTPException(status_code=400, detail="Nome e cognome sono obbligatori per un account persona fisica")
+        display_name = payload.full_name
+
+    base_slug = slugify(display_name)
     slug = base_slug
     i = 1
     while db.query(models.Tenant).filter(models.Tenant.slug == slug).first():
@@ -35,10 +65,21 @@ def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_d
         slug = f"{base_slug}-{i}"
 
     tenant = models.Tenant(
-        name=payload.company_name,
+        name=display_name,
         slug=slug,
-        sector=payload.sector,
+        sector=payload.sector if account_type == "azienda" else None,
         default_language=payload.language,
+        account_type=models.AccountTypeEnum(account_type),
+        address=payload.address,
+        phone=payload.phone,
+        email=payload.email,
+        company_type=models.CompanyTypeEnum(payload.company_type) if account_type == "azienda" else None,
+        vat_number=payload.vat_number if account_type == "azienda" else None,
+        vat_country_code=vat_country_code,
+        pec=payload.pec if (account_type == "azienda" and vat_country_code == "IT") else None,
+        contact_full_name=payload.contact_full_name if account_type == "azienda" else None,
+        contact_phone=payload.contact_phone if account_type == "azienda" else None,
+        contact_email=payload.contact_email if account_type == "azienda" else None,
     )
     db.add(tenant)
     db.flush()
@@ -74,4 +115,21 @@ def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=schemas.UserOut)
 def me(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me", response_model=schemas.UserOut)
+def update_me(payload: schemas.UserProfileUpdate, db: Session = Depends(get_db),
+              current_user: models.User = Depends(get_current_user)):
+    """Modifica i dati personali dell'utente loggato (nome, lingua, password)."""
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+    if payload.language is not None:
+        current_user.language = payload.language
+    if payload.new_password:
+        if not payload.current_password or not verify_password(payload.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Password attuale non corretta")
+        current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    db.refresh(current_user)
     return current_user

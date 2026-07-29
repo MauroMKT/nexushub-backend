@@ -9,14 +9,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
 from .routers import (appointments_router, auth_router, clients_router,
-                       dashboard_router, pipeline_router, tasks_router, team_router)
+                       dashboard_router, pipeline_router, tasks_router, team_router,
+                       automations_router, whatsapp_router, email_router,
+                       contacts_router, notifications_router, client_portal_router,
+                       google_calendar_router, platform_admin_router, billing_router,
+                       chat_router, client_chat_router, client_documents_router,
+                       client_import_router, accounting_router)
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="NexusHub CRM API",
-    description="API Fase 1 (MVP) della piattaforma CRM modulare NexusHub.",
-    version="0.1.0",
+    description="API Fase 1 & 2 della piattaforma CRM modulare NexusHub.",
+    version="0.2.0",
 )
 
 # In produzione limitare origins al dominio del frontend
@@ -35,6 +40,22 @@ app.include_router(appointments_router.router)
 app.include_router(tasks_router.router)
 app.include_router(team_router.router)
 app.include_router(dashboard_router.router)
+app.include_router(automations_router.router)
+app.include_router(whatsapp_router.router)
+app.include_router(email_router.router)
+app.include_router(contacts_router.router)
+app.include_router(notifications_router.router)
+app.include_router(client_portal_router.router)
+app.include_router(google_calendar_router.router)
+app.include_router(platform_admin_router.router)
+app.include_router(billing_router.router)
+app.include_router(chat_router.router)
+app.include_router(client_chat_router.team_router)
+app.include_router(client_chat_router.portal_router)
+app.include_router(client_documents_router.team_router)
+app.include_router(client_documents_router.portal_router)
+app.include_router(client_import_router.router)
+app.include_router(accounting_router.router)
 
 
 @app.get("/")
