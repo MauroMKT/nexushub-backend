@@ -4,6 +4,8 @@ Implementa: M1 CRM Core, M2 Agenda & Calendario, M3 Reminder & Task,
 M4 Gestione Appuntamenti, M11 Impostazioni/Team/Multilingua, Dashboard base.
 Riferimento: Piano_di_Sviluppo.docx, Sezioni 3, 4 e 9 (Prompt Fase 1).
 """
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -35,6 +37,22 @@ for _stmt in _TENANT_COLUMN_MIGRATIONS:
             conn.commit()
     except Exception:
         pass  # dialetti che non supportano "IF NOT EXISTS" (es. SQLite in locale) vengono ignorati
+
+# Bootstrap super admin: se impostata, promuove a role="platform_admin" l'utente
+# con questa email ad ogni avvio. Idempotente e innocuo se l'utente è già
+# platform_admin o se l'email non esiste ancora (nessuna riga aggiornata).
+# Evita di dover intervenire manualmente sul DB per assegnare il primo super admin.
+_BOOTSTRAP_ADMIN_EMAIL = os.environ.get("BOOTSTRAP_PLATFORM_ADMIN_EMAIL")
+if _BOOTSTRAP_ADMIN_EMAIL:
+    try:
+        with engine.connect() as conn:
+            conn.execute(
+                text("UPDATE users SET role = 'platform_admin' WHERE email = :email"),
+                {"email": _BOOTSTRAP_ADMIN_EMAIL},
+            )
+            conn.commit()
+    except Exception:
+        pass
 
 app = FastAPI(
     title="NexusHub CRM API",
