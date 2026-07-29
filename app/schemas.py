@@ -12,12 +12,15 @@ class TenantRegister(BaseModel):
 
     # Comuni a entrambi i tipi di account
     address: Optional[str] = None
+    zip_code: Optional[str] = None
+    country: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
 
     # Solo per account_type == "azienda"
     company_type: Optional[str] = None  # spa | srl | srls | ditta_individuale | libero_professionista
     legal_name: Optional[str] = None  # ragione sociale
+    trade_name: Optional[str] = None  # nome commerciale (se diverso dalla ragione sociale)
     sector: Optional[str] = None
     vat_number: Optional[str] = None
     pec: Optional[str] = None
@@ -89,9 +92,12 @@ class TenantOut(BaseModel):
     accent_color: str
     account_type: str
     address: Optional[str] = None
+    zip_code: Optional[str] = None
+    country: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     company_type: Optional[str] = None
+    trade_name: Optional[str] = None
     vat_number: Optional[str] = None
     vat_country_code: Optional[str] = None
     pec: Optional[str] = None
@@ -111,9 +117,12 @@ class TenantUpdate(BaseModel):
     accent_color: Optional[str] = None
     sector: Optional[str] = None
     address: Optional[str] = None
+    zip_code: Optional[str] = None
+    country: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     company_type: Optional[str] = None
+    trade_name: Optional[str] = None
     vat_number: Optional[str] = None
     pec: Optional[str] = None
     contact_full_name: Optional[str] = None

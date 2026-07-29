@@ -86,11 +86,14 @@ class Tenant(Base):
     # --- Dati anagrafici di registrazione (comuni ad azienda e persona fisica) ---
     account_type = Column(Enum(AccountTypeEnum), default=AccountTypeEnum.azienda)
     address = Column(String, nullable=True)
+    zip_code = Column(String, nullable=True)  # CAP
+    country = Column(String, nullable=True)  # nazione
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
 
     # --- Solo per account_type == azienda ---
     company_type = Column(Enum(CompanyTypeEnum), nullable=True)
+    trade_name = Column(String, nullable=True)  # nome commerciale (se diverso dalla ragione sociale)
     vat_number = Column(String, nullable=True)
     vat_country_code = Column(String, nullable=True)  # rilevato automaticamente dalla P.IVA
     pec = Column(String, nullable=True)  # solo aziende italiane

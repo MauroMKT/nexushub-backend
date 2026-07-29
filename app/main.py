@@ -6,6 +6,7 @@ Riferimento: Piano_di_Sviluppo.docx, Sezioni 3, 4 e 9 (Prompt Fase 1).
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from .database import Base, engine
 from .routers import (appointments_router, auth_router, clients_router,
@@ -17,6 +18,23 @@ from .routers import (appointments_router, auth_router, clients_router,
                        client_import_router, accounting_router)
 
 Base.metadata.create_all(bind=engine)
+
+# Micro-migrazione: create_all crea solo le tabelle mancanti, non aggiunge colonne
+# a tabelle già esistenti. Per colonne nuove aggiunte dopo il primo deploy (es.
+# tenants.trade_name) le allineiamo qui con un ALTER TABLE idempotente, senza
+# introdurre Alembic per un progetto di queste dimensioni.
+_TENANT_COLUMN_MIGRATIONS = [
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS trade_name VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS zip_code VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS country VARCHAR",
+]
+for _stmt in _TENANT_COLUMN_MIGRATIONS:
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(_stmt))
+            conn.commit()
+    except Exception:
+        pass  # dialetti che non supportano "IF NOT EXISTS" (es. SQLite in locale) vengono ignorati
 
 app = FastAPI(
     title="NexusHub CRM API",
