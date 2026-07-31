@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
-from ..import_utils import CONTACT_FIELD_ALIASES, CONTACT_KNOWN_FIELDS, parse_import_content
+from ..import_utils import CONTACT_FIELD_ALIASES, CONTACT_KNOWN_FIELDS, looks_like_email, parse_import_content
 
 router = APIRouter(prefix="/contacts/import", tags=["Import Rubrica"])
 
@@ -63,7 +63,7 @@ def commit_import(payload: schemas.ContactImportRequest, db: Session = Depends(g
 
         existing = None
         email = row.get("email")
-        if email:
+        if email and looks_like_email(email):
             existing = db.query(models.Contact).filter(
                 models.Contact.tenant_id == user.tenant_id, models.Contact.email == email
             ).first()
