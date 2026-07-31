@@ -846,6 +846,11 @@ class ModuleCatalogItem(BaseModel):
     has_dedicated_feature: bool = False  # True se ha una pagina propria (non solo etichetta)
     dedicated_route: Optional[str] = None  # rotta frontend della pagina dedicata, se presente
     purchased_standalone: bool = False  # True se attivo tramite acquisto singolo (Fase 9.2), non piano
+    # Etichetta dell'elemento di lavoro per i moduli "generici" di Fase 9.3
+    # (es. "Pratica Legale" per studi_legali): None per i 4 moduli pilota
+    # bespoke di Fase 9.1, che hanno il proprio nome nella pagina dedicata.
+    record_label_it: Optional[str] = None
+    record_label_en: Optional[str] = None
 
 
 class TenantModuleActivationOut(BaseModel):
@@ -1037,6 +1042,41 @@ class MenuItemOut(BaseModel):
     price: float
     description: Optional[str]
     is_available: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Moduli di settore "generici" (Fase 9.3) ----------
+class SectorRecordCreate(BaseModel):
+    title: str
+    client_id: Optional[str] = None
+    status: str = "aperto"
+    value: Optional[float] = None
+    reference_date: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class SectorRecordUpdate(BaseModel):
+    title: Optional[str] = None
+    client_id: Optional[str] = None
+    status: Optional[str] = None
+    value: Optional[float] = None
+    reference_date: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class SectorRecordOut(BaseModel):
+    id: str
+    module_slug: str
+    title: str
+    client_id: Optional[str]
+    client_name: Optional[str] = None
+    status: str
+    value: Optional[float]
+    reference_date: Optional[datetime]
+    notes: Optional[str]
     created_at: datetime
 
     class Config:

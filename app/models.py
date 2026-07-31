@@ -654,3 +654,35 @@ class MenuItem(Base):
     description = Column(Text, nullable=True)
     is_available = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ---------- Moduli di settore "generici" (Fase 9.3) ----------
+class SectorRecordStatus(str, enum.Enum):
+    aperto = "aperto"
+    in_corso = "in_corso"
+    chiuso = "chiuso"
+
+
+class SectorRecord(Base):
+    """Elemento di lavoro generico per i settori del catalogo SENZA uno schema
+    dati bespoke (a differenza dei 4 moduli pilota di Fase 9.1, che hanno
+    ciascuno la propria tabella). Un'unica tabella parametrizzata da
+    module_slug copre tutti gli altri ~18 settori (studi legali, officine,
+    palestre, ecc.): l'etichetta mostrata in UI per "title" cambia per settore
+    tramite record_label_it/en in modules_catalog.py, ma la struttura dati e
+    gli endpoint (sector_records_router.py) restano condivisi."""
+    __tablename__ = "sector_records"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    module_slug = Column(String, nullable=False, index=True)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=True)
+    title = Column(String, nullable=False)
+    status = Column(Enum(SectorRecordStatus), default=SectorRecordStatus.aperto)
+    value = Column(Float, nullable=True)
+    reference_date = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = relationship("Client")

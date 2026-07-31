@@ -19,7 +19,7 @@ from .routers import (appointments_router, auth_router, clients_router,
                        chat_router, client_chat_router, client_documents_router,
                        client_import_router, accounting_router, modules_router,
                        engineering_router, agency_router, realestate_router,
-                       hospitality_router)
+                       hospitality_router, sector_records_router)
 
 Base.metadata.create_all(bind=engine)
 
@@ -106,6 +106,7 @@ app.include_router(engineering_router.router)
 app.include_router(agency_router.router)
 app.include_router(realestate_router.router)
 app.include_router(hospitality_router.router)
+app.include_router(sector_records_router.router)
 
 
 @app.get("/")
