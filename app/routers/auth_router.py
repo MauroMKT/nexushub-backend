@@ -28,9 +28,6 @@ def slugify(name: str) -> str:
 DEFAULT_PIPELINE_STAGES = ["Nuovo Lead", "Contattato", "Proposta Inviata", "Trattativa", "Vinto", "Perso"]
 
 
-VALID_COMPANY_TYPES = {"spa", "srl", "srls", "ditta_individuale", "libero_professionista"}
-
-
 @router.post("/register", response_model=schemas.Token)
 def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_db)):
     """Crea una nuova azienda cliente (tenant) con il primo utente amministratore.
@@ -46,10 +43,16 @@ def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_d
     if account_type == "azienda":
         if not payload.legal_name:
             raise HTTPException(status_code=400, detail="La ragione sociale è obbligatoria per un account azienda")
-        if not payload.company_type or payload.company_type not in VALID_COMPANY_TYPES:
-            raise HTTPException(status_code=400, detail="Tipo di azienda non valido")
         display_name = payload.legal_name
-        if payload.vat_number:
+        # Riconoscimento del paese per il codice identificativo fiscale: la fonte
+        # primaria è la selezione esplicita del paese nel form (più affidabile,
+        # perché non dipende dal formato del numero che varia da stato a stato).
+        # Se non è un codice ISO2 valido, fallback al vecchio riconoscimento dal
+        # formato della P.IVA per retrocompatibilità con client non aggiornati.
+        explicit_country = (payload.country or "").strip().upper()
+        if len(explicit_country) == 2 and explicit_country.isalpha():
+            vat_country_code = explicit_country
+        elif payload.vat_number:
             vat_info = detect_vat_country(payload.vat_number)
             vat_country_code = vat_info["country_code"]
     else:
@@ -75,7 +78,7 @@ def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_d
         country=payload.country,
         phone=payload.phone,
         email=payload.email,
-        company_type=models.CompanyTypeEnum(payload.company_type) if account_type == "azienda" else None,
+        company_type=payload.company_type if account_type == "azienda" else None,
         trade_name=payload.trade_name if account_type == "azienda" else None,
         vat_number=payload.vat_number if account_type == "azienda" else None,
         vat_country_code=vat_country_code,
