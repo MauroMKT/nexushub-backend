@@ -13,6 +13,8 @@ from .. import models, schemas
 from ..auth import create_access_token, hash_password, require_platform_admin
 from ..config import settings
 from ..database import get_db
+from ..modules_catalog import MODULE_BY_SLUG, MODULE_CATALOG, plan_meets_minimum
+from ..tenant_deletion import hard_delete_tenant
 
 router = APIRouter(prefix="/platform-admin", tags=["Super Admin"])
 
@@ -158,11 +160,86 @@ def list_tenant_users(tenant_id: str, db: Session = Depends(get_db), _admin: mod
 
 @router.delete("/tenants/{tenant_id}")
 def suspend_tenant(tenant_id: str, db: Session = Depends(get_db), _admin: models.User = Depends(require_platform_admin)):
-    """Non cancella i dati: sospende l'accesso (is_active=False). Una cancellazione
-    reale è un'operazione troppo distruttiva per un singolo click da UI."""
+    """Non cancella i dati: sospende l'accesso (is_active=False). Reversibile
+    riattivando il tenant. Per la cancellazione DEFINITIVA vedi l'endpoint
+    /tenants/{tenant_id}/permanent qui sotto."""
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant non trovato")
     tenant.is_active = False
     db.commit()
     return {"status": "sospeso"}
+
+
+@router.delete("/tenants/{tenant_id}/permanent")
+def delete_tenant_permanently(tenant_id: str, db: Session = Depends(get_db),
+                               _admin: models.User = Depends(require_platform_admin)):
+    """Cancellazione DEFINITIVA e irreversibile di un tenant e di tutti i suoi
+    dati (utenti, clienti, trattative, fatture, chat, documenti, moduli
+    attivati, ecc.). Diversa dalla sospensione: qui non c'è modo di tornare
+    indietro. Il frontend richiede una doppia conferma esplicita prima di
+    chiamare questo endpoint."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant non trovato")
+    if tenant.slug == PLATFORM_TENANT_SLUG:
+        raise HTTPException(status_code=400, detail="Non è possibile cancellare il tenant interno della piattaforma")
+    hard_delete_tenant(db, tenant_id)
+    return {"status": "cancellato definitivamente"}
+
+
+# ---------- Moduli di settore per un tenant specifico (Fase 9) ----------
+@router.get("/tenants/{tenant_id}/modules", response_model=List[schemas.ModuleCatalogItem])
+def list_tenant_modules(tenant_id: str, db: Session = Depends(get_db),
+                         _admin: models.User = Depends(require_platform_admin)):
+    """Catalogo completo dei moduli con lo stato di attivazione per QUESTO
+    tenant. Il campo 'unlocked' è sempre True qui: il super admin può
+    attivare qualunque modulo per qualunque tenant a prescindere dal piano."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant non trovato")
+    active_slugs = {
+        row.module_id
+        for row in db.query(models.TenantModuleActivation.module_id)
+        .filter(models.TenantModuleActivation.tenant_id == tenant_id).all()
+    }
+    return [
+        schemas.ModuleCatalogItem(
+            slug=m["slug"], sector_group=m["sector_group"], min_plan=m["min_plan"],
+            name_it=m["name_it"], name_en=m["name_en"],
+            is_active_for_tenant=m["slug"] in active_slugs, unlocked=True,
+        )
+        for m in MODULE_CATALOG
+    ]
+
+
+@router.post("/tenants/{tenant_id}/modules/{module_slug}")
+def activate_tenant_module(tenant_id: str, module_slug: str, db: Session = Depends(get_db),
+                            _admin: models.User = Depends(require_platform_admin)):
+    """Il super admin attiva un modulo per un tenant qualsiasi, a prescindere
+    dal piano: utile per sbloccare una funzionalità in trattativa commerciale
+    prima ancora che il cliente faccia l'upgrade."""
+    if module_slug not in MODULE_BY_SLUG:
+        raise HTTPException(status_code=404, detail="Modulo non trovato")
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant non trovato")
+    existing = db.query(models.TenantModuleActivation).filter(
+        models.TenantModuleActivation.tenant_id == tenant_id,
+        models.TenantModuleActivation.module_id == module_slug,
+    ).first()
+    if not existing:
+        db.add(models.TenantModuleActivation(tenant_id=tenant_id, module_id=module_slug, activated_by="platform_admin"))
+        db.commit()
+    return {"status": "attivato"}
+
+
+@router.delete("/tenants/{tenant_id}/modules/{module_slug}")
+def deactivate_tenant_module(tenant_id: str, module_slug: str, db: Session = Depends(get_db),
+                              _admin: models.User = Depends(require_platform_admin)):
+    db.query(models.TenantModuleActivation).filter(
+        models.TenantModuleActivation.tenant_id == tenant_id,
+        models.TenantModuleActivation.module_id == module_slug,
+    ).delete()
+    db.commit()
+    return {"status": "disattivato"}

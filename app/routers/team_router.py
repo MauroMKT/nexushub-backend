@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import get_current_user, hash_password, require_admin
+from ..auth import get_current_user, hash_password, require_admin, verify_password
 from ..config import settings
 from ..database import get_db
+from ..tenant_deletion import hard_delete_tenant
 
 router = APIRouter(tags=["Impostazioni & Team"])
 
@@ -53,6 +54,23 @@ def update_tenant_settings(payload: schemas.TenantUpdate, db: Session = Depends(
     db.commit()
     db.refresh(tenant)
     return tenant
+
+
+@router.delete("/settings/tenant")
+def delete_own_tenant(payload: schemas.TenantSelfDelete, db: Session = Depends(get_db),
+                       admin: models.User = Depends(require_admin)):
+    """Cancellazione permanente e irreversibile del proprio account/azienda,
+    richiedibile solo dall'amministratore del tenant (non da un membro
+    qualsiasi, vedi require_admin). Richiede la password corrente come
+    conferma, per evitare cancellazioni accidentali o da sessioni compromesse.
+    Cancella TUTTI i dati del tenant: clienti, trattative, fatture, chat,
+    documenti, moduli attivati, utenti del team."""
+    if admin.role == models.RoleEnum.platform_admin:
+        raise HTTPException(status_code=400, detail="Il super admin non può cancellare il tenant della piattaforma da qui")
+    if not verify_password(payload.password, admin.hashed_password):
+        raise HTTPException(status_code=400, detail="Password non corretta")
+    hard_delete_tenant(db, admin.tenant_id)
+    return {"status": "account cancellato"}
 
 
 @router.get("/settings/languages")
