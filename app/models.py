@@ -36,14 +36,6 @@ class AccountTypeEnum(str, enum.Enum):
     persona_fisica = "persona_fisica"
 
 
-class CompanyTypeEnum(str, enum.Enum):
-    spa = "spa"  # Società per Azioni
-    srl = "srl"  # Società a Responsabilità Limitata
-    srls = "srls"  # Società a Responsabilità Limitata Semplificata
-    ditta_individuale = "ditta_individuale"
-    libero_professionista = "libero_professionista"
-
-
 class AppointmentStatus(str, enum.Enum):
     scheduled = "scheduled"
     confirmed = "confirmed"
@@ -92,7 +84,10 @@ class Tenant(Base):
     email = Column(String, nullable=True)
 
     # --- Solo per account_type == azienda ---
-    company_type = Column(Enum(CompanyTypeEnum), nullable=True)
+    # Testo libero: le forme giuridiche societarie variano da paese a paese
+    # (S.r.l., LLC, GmbH, SAS, ...), quindi non ha senso vincolarle a un enum
+    # fisso pensato solo per l'Italia.
+    company_type = Column(String, nullable=True)
     trade_name = Column(String, nullable=True)  # nome commerciale (se diverso dalla ragione sociale)
     vat_number = Column(String, nullable=True)
     vat_country_code = Column(String, nullable=True)  # rilevato automaticamente dalla P.IVA

@@ -29,6 +29,10 @@ _TENANT_COLUMN_MIGRATIONS = [
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS trade_name VARCHAR",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS zip_code VARCHAR",
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS country VARCHAR",
+    # company_type era un ENUM Postgres vincolato a 5 forme giuridiche italiane;
+    # ora è testo libero perché le forme giuridiche variano da paese a paese.
+    # Idempotente: se la colonna è già VARCHAR il cast è un no-op innocuo.
+    "ALTER TABLE tenants ALTER COLUMN company_type TYPE VARCHAR USING company_type::text",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:
