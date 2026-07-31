@@ -568,13 +568,6 @@ class PlatformStats(BaseModel):
     tenants_by_plan: dict
 
 
-class ImpersonateOut(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    tenant_name: str
-    impersonated_user_email: str
-
-
 # ---------- Abbonamenti (Fase 7) ----------
 class BillingPlanOut(BaseModel):
     id: str
