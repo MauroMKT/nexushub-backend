@@ -45,6 +45,8 @@ def _catalog_for_tenant(db: Session, tenant: models.Tenant) -> List[schemas.Modu
             has_dedicated_feature=bool(m.get("has_dedicated_feature")),
             dedicated_route=DEDICATED_ROUTES.get(m["slug"]),
             purchased_standalone=bool(activation and activation.activated_by == "purchased"),
+            record_label_it=m.get("record_label_it"),
+            record_label_en=m.get("record_label_en"),
         ))
     return items
 
