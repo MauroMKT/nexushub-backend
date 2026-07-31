@@ -118,6 +118,16 @@ class TenantOut(BaseModel):
     contact_full_name: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
+    # Fase 9.8: configurazione SMTP per l'invio reale delle campagne email.
+    # smtp_password NON è incluso qui apposta: non va mai restituito dalla API,
+    # nemmeno al proprietario del tenant (si può solo sovrascrivere via TenantUpdate).
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_username: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    smtp_use_tls: bool = True
+    smtp_configured: bool = False
 
     class Config:
         from_attributes = True
@@ -142,6 +152,15 @@ class TenantUpdate(BaseModel):
     contact_full_name: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_email: Optional[EmailStr] = None
+    # Fase 9.8: impostazioni SMTP, modificabili dall'admin del tenant dalla
+    # pagina Impostazioni. smtp_password è scrivibile ma mai leggibile (vedi TenantOut).
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[EmailStr] = None
+    smtp_from_name: Optional[str] = None
+    smtp_use_tls: Optional[bool] = None
 
 
 class UserProfileUpdate(BaseModel):
@@ -421,6 +440,10 @@ class EmailCampaignOut(BaseModel):
     sent_count: int
     open_count: int
     click_count: int
+    # Fase 9.8: esito reale dell'invio SMTP (vedi email_router.py), al posto
+    # delle sole statistiche simulate open_count/click_count di prima.
+    status: str = "draft"
+    failed_count: int = 0
     created_at: datetime
 
     class Config:

@@ -100,8 +100,25 @@ class Tenant(Base):
     invoice_seq_year = Column(Integer, nullable=True)
     invoice_seq_last = Column(Integer, default=0)
 
+    # --- Configurazione SMTP per l'invio reale delle campagne Email Marketing
+    # (Fase 9.8). Ogni tenant usa il proprio server SMTP (self-service): non
+    # c'è una chiave/API condivisa lato piattaforma, così "tutti gli account"
+    # possono inviare email davvero senza dipendere da una quota centralizzata.
+    smtp_host = Column(String, nullable=True)
+    smtp_port = Column(Integer, nullable=True)
+    smtp_username = Column(String, nullable=True)
+    smtp_password = Column(String, nullable=True)
+    smtp_from_email = Column(String, nullable=True)
+    smtp_from_name = Column(String, nullable=True)
+    smtp_use_tls = Column(Boolean, default=True)
+
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     clients = relationship("Client", back_populates="tenant", cascade="all, delete-orphan")
+
+    @property
+    def smtp_configured(self) -> bool:
+        """True se il tenant ha impostato abbastanza per tentare un invio reale."""
+        return bool(self.smtp_host and self.smtp_from_email)
 
 
 class User(Base):
@@ -301,6 +318,11 @@ class EmailCampaign(Base):
     sent_count = Column(Integer, default=0)
     open_count = Column(Integer, default=0)
     click_count = Column(Integer, default=0)
+    # Fase 9.8: l'invio non è più simulato (vedi email_router.py) — questi due
+    # campi rendono visibile l'esito reale invece delle sole statistiche finte
+    # di apertura/click che nessun invio SMTP diretto può davvero misurare.
+    status = Column(String, default="draft")  # draft | sent | failed
+    failed_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

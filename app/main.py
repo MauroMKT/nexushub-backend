@@ -42,6 +42,17 @@ _TENANT_COLUMN_MIGRATIONS = [
     # corrispondono a un campo noto (vedi import_utils.py e schemas.py).
     "ALTER TABLE clients ADD COLUMN IF NOT EXISTS extra_fields TEXT",
     "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS extra_fields TEXT",
+    # Fase 9.8: configurazione SMTP per tenant (invio reale email marketing)
+    # ed esito reale delle campagne al posto delle statistiche simulate.
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_host VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_port INTEGER",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_username VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_password VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_from_email VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_from_name VARCHAR",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_use_tls BOOLEAN DEFAULT TRUE",
+    "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'draft'",
+    "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS failed_count INTEGER DEFAULT 0",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:
