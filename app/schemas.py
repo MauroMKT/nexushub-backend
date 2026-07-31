@@ -1,8 +1,22 @@
 """Schemi Pydantic (request/response) per l'API Fase 1."""
+import json as _json
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
+
+
+def _parse_extra_fields(v):
+    """extra_fields è salvato in DB come stringa JSON (Text); qui lo riportiamo
+    a dict per l'output API. Usato dal validator di ClientOut/ContactOut."""
+    if v is None or isinstance(v, dict):
+        return v
+    if isinstance(v, str):
+        try:
+            return _json.loads(v)
+        except (TypeError, ValueError):
+            return None
+    return v
 
 
 # ---------- Auth / Onboarding (M11) ----------
@@ -188,8 +202,13 @@ class ClientOut(BaseModel):
     sector: Optional[str]
     notes: Optional[str]
     currency: str
+    # Fase 9.5: colonne extra da un import CSV/JSON/XML senza corrispondenza
+    # nello schema fisso (vedi import_utils.py e Client.extra_fields).
+    extra_fields: Optional[dict] = None
     created_at: datetime
     tags: List[TagOut] = []
+
+    _validate_extra_fields = field_validator("extra_fields", mode="before")(_parse_extra_fields)
 
     class Config:
         from_attributes = True
@@ -462,7 +481,11 @@ class ContactOut(BaseModel):
     category: str
     notes: Optional[str]
     client_id: Optional[str]
+    # Fase 9.5: vedi ClientOut.extra_fields, stessa logica per l'import Rubrica.
+    extra_fields: Optional[dict] = None
     created_at: datetime
+
+    _validate_extra_fields = field_validator("extra_fields", mode="before")(_parse_extra_fields)
 
     class Config:
         from_attributes = True
@@ -695,6 +718,9 @@ class ClientImportRow(BaseModel):
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
     sector: Optional[str] = None
+    # Fase 9.5: colonne del file senza corrispondenza nello schema fisso,
+    # mostrate in anteprima così l'utente vede cosa verrà salvato in extra_fields.
+    extra_fields: Optional[dict] = None
 
 
 class ClientImportPreviewOut(BaseModel):
@@ -705,6 +731,41 @@ class ClientImportPreviewOut(BaseModel):
 
 
 class ClientImportResultOut(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    errors: List[str]
+
+
+# --- Import Rubrica/Contatti da CSV/JSON/XML (Fase 9.5) ---
+# Stessa forma dell'import Clienti sopra, campi diversi (vedi CONTACT_KNOWN_FIELDS
+# in import_utils.py) perché Contact è un'anagrafica distinta da Client.
+class ContactImportRequest(BaseModel):
+    format: str  # "csv" | "json" | "xml"
+    content: str
+    duplicate_strategy: str = "skip"  # "skip" | "update" (match per email, solo in fase di commit)
+
+
+class ContactImportRow(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    company: Optional[str] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+    extra_fields: Optional[dict] = None
+
+
+class ContactImportPreviewOut(BaseModel):
+    total_rows: int
+    valid_rows: int
+    errors: List[str]
+    preview: List[ContactImportRow]
+
+
+class ContactImportResultOut(BaseModel):
     created: int
     updated: int
     skipped: int

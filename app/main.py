@@ -19,7 +19,7 @@ from .routers import (appointments_router, auth_router, clients_router,
                        chat_router, client_chat_router, client_documents_router,
                        client_import_router, accounting_router, modules_router,
                        engineering_router, agency_router, realestate_router,
-                       hospitality_router, sector_records_router)
+                       hospitality_router, sector_records_router, contacts_import_router)
 
 Base.metadata.create_all(bind=engine)
 
@@ -38,6 +38,10 @@ _TENANT_COLUMN_MIGRATIONS = [
     # Fase 9.2: traccia l'abbonamento Stripe dedicato quando un modulo viene
     # acquistato singolarmente (indipendente dal piano del tenant).
     "ALTER TABLE tenant_module_activations ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR",
+    # Fase 9.5: colonne extra scoperte durante un import CSV/JSON/XML che non
+    # corrispondono a un campo noto (vedi import_utils.py e schemas.py).
+    "ALTER TABLE clients ADD COLUMN IF NOT EXISTS extra_fields TEXT",
+    "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS extra_fields TEXT",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:
@@ -107,6 +111,7 @@ app.include_router(agency_router.router)
 app.include_router(realestate_router.router)
 app.include_router(hospitality_router.router)
 app.include_router(sector_records_router.router)
+app.include_router(contacts_import_router.router)
 
 
 @app.get("/")

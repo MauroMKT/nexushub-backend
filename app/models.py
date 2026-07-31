@@ -159,6 +159,12 @@ class Client(Base):
     sector = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
     currency = Column(String, default="EUR")
+    # Fase 9.5: colonne extra scoperte durante un import CSV/JSON/XML che non
+    # corrispondono a nessun campo noto (name/company/email/...). Salvate come
+    # JSON in un'unica colonna testo invece di alterare lo schema ad ogni CSV
+    # diverso: così l'import "si adatta" al file senza perdere dati che non
+    # avevano un campo dedicato.
+    extra_fields = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -326,6 +332,8 @@ class Contact(Base):
     category = Column(String, default="altro")  # cliente | fornitore | collega | altro
     notes = Column(Text, nullable=True)
     client_id = Column(String, ForeignKey("clients.id"), nullable=True)
+    # Fase 9.5: vedi Client.extra_fields, stessa logica per l'import CSV in Rubrica.
+    extra_fields = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
