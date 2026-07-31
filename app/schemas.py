@@ -841,6 +841,15 @@ class ModuleCatalogItem(BaseModel):
     min_plan: str
     name_it: str
     name_en: str
+    # Fase 9.4: nome del modulo nelle altre 7 lingue dell'app (prima mancavano,
+    # e il frontend ricadeva sull'inglese per chi usava FR/DE/ES/ZH/JA/RU/AR).
+    name_fr: Optional[str] = None
+    name_de: Optional[str] = None
+    name_es: Optional[str] = None
+    name_zh: Optional[str] = None
+    name_ja: Optional[str] = None
+    name_ru: Optional[str] = None
+    name_ar: Optional[str] = None
     is_active_for_tenant: bool = False
     unlocked: bool = True  # False se il piano del tenant non raggiunge min_plan
     has_dedicated_feature: bool = False  # True se ha una pagina propria (non solo etichetta)
@@ -851,6 +860,24 @@ class ModuleCatalogItem(BaseModel):
     # bespoke di Fase 9.1, che hanno il proprio nome nella pagina dedicata.
     record_label_it: Optional[str] = None
     record_label_en: Optional[str] = None
+    record_label_fr: Optional[str] = None
+    record_label_de: Optional[str] = None
+    record_label_es: Optional[str] = None
+    record_label_zh: Optional[str] = None
+    record_label_ja: Optional[str] = None
+    record_label_ru: Optional[str] = None
+    record_label_ar: Optional[str] = None
+    # Fase 9.4: intestazione di gruppo (es. "Automotive") tradotta in tutte le
+    # lingue, al posto del solo valore italiano grezzo di sector_group.
+    sector_group_it: Optional[str] = None
+    sector_group_en: Optional[str] = None
+    sector_group_fr: Optional[str] = None
+    sector_group_de: Optional[str] = None
+    sector_group_es: Optional[str] = None
+    sector_group_zh: Optional[str] = None
+    sector_group_ja: Optional[str] = None
+    sector_group_ru: Optional[str] = None
+    sector_group_ar: Optional[str] = None
 
 
 class TenantModuleActivationOut(BaseModel):
@@ -869,6 +896,31 @@ class ModulePublicCatalogItem(BaseModel):
     sector_group: str
     name_it: str
     name_en: str
+    name_fr: Optional[str] = None
+    name_de: Optional[str] = None
+    name_es: Optional[str] = None
+    name_zh: Optional[str] = None
+    name_ja: Optional[str] = None
+    name_ru: Optional[str] = None
+    name_ar: Optional[str] = None
+    record_label_it: Optional[str] = None
+    record_label_en: Optional[str] = None
+    record_label_fr: Optional[str] = None
+    record_label_de: Optional[str] = None
+    record_label_es: Optional[str] = None
+    record_label_zh: Optional[str] = None
+    record_label_ja: Optional[str] = None
+    record_label_ru: Optional[str] = None
+    record_label_ar: Optional[str] = None
+    sector_group_it: Optional[str] = None
+    sector_group_en: Optional[str] = None
+    sector_group_fr: Optional[str] = None
+    sector_group_de: Optional[str] = None
+    sector_group_es: Optional[str] = None
+    sector_group_zh: Optional[str] = None
+    sector_group_ja: Optional[str] = None
+    sector_group_ru: Optional[str] = None
+    sector_group_ar: Optional[str] = None
 
 
 # ---------- Moduli pilota con funzionalità dedicata (Fase 9.1) ----------
