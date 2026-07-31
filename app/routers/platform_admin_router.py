@@ -156,26 +156,6 @@ def list_tenant_users(tenant_id: str, db: Session = Depends(get_db), _admin: mod
     return db.query(models.User).filter(models.User.tenant_id == tenant_id).all()
 
 
-@router.post("/tenants/{tenant_id}/impersonate", response_model=schemas.ImpersonateOut)
-def impersonate_tenant_admin(tenant_id: str, db: Session = Depends(get_db),
-                              _admin: models.User = Depends(require_platform_admin)):
-    """Genera un token valido per agire come l'amministratore di un tenant, per
-    supporto tecnico. L'azione resta sempre visibile nel log applicativo lato
-    Railway (nessuna finta anonimizzazione)."""
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant non trovato")
-    target_user = (
-        db.query(models.User)
-        .filter(models.User.tenant_id == tenant_id, models.User.role == models.RoleEnum.admin)
-        .first()
-    )
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Nessun amministratore trovato per questo tenant")
-    token = create_access_token({"sub": target_user.id, "tenant_id": tenant.id, "impersonated": True})
-    return schemas.ImpersonateOut(access_token=token, tenant_name=tenant.name, impersonated_user_email=target_user.email)
-
-
 @router.delete("/tenants/{tenant_id}")
 def suspend_tenant(tenant_id: str, db: Session = Depends(get_db), _admin: models.User = Depends(require_platform_admin)):
     """Non cancella i dati: sospende l'accesso (is_active=False). Una cancellazione
