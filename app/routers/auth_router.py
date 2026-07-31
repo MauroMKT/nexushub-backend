@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import create_access_token, get_current_user, hash_password, verify_password
 from ..database import get_db
+from ..modules_catalog import MODULE_BY_SLUG
 from ..vat_utils import detect_vat_country
 
 router = APIRouter(prefix="/auth", tags=["Autenticazione"])
@@ -70,7 +71,10 @@ def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_d
     tenant = models.Tenant(
         name=display_name,
         slug=slug,
-        sector=payload.sector if account_type == "azienda" else None,
+        # Il settore serve a determinare quale modulo di settore autoattivare
+        # subito dopo (vedi sotto): ha senso anche per una persona fisica
+        # (es. un libero professionista che dichiara "Studi Legali").
+        sector=payload.sector,
         default_language=payload.language,
         account_type=models.AccountTypeEnum(account_type),
         address=payload.address,
@@ -103,6 +107,18 @@ def register_tenant(payload: schemas.TenantRegister, db: Session = Depends(get_d
         language=payload.language,
     )
     db.add(admin_user)
+
+    # Autoattivazione del modulo di settore dichiarato (Fase 9.1): se il valore
+    # scelto nel menu a tendina "Settore" corrisponde a uno slug del catalogo
+    # moduli, lo attiviamo subito per il nuovo tenant, a prescindere dal piano
+    # (parte sempre in "free"): è il modulo del SUO settore, non un upsell.
+    # activated_by="auto_sector" distingue questa attivazione da un'autoattivazione
+    # manuale entro il piano o da un acquisto singolo, per chiarezza in reportistica.
+    if payload.sector and payload.sector in MODULE_BY_SLUG:
+        db.add(models.TenantModuleActivation(
+            tenant_id=tenant.id, module_id=payload.sector, activated_by="auto_sector",
+        ))
+
     db.commit()
     db.refresh(admin_user)
 

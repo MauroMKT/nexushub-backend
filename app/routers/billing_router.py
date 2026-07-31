@@ -150,17 +150,39 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         tenant_id = metadata.get("tenant_id")
         tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first() if tenant_id else None
         if tenant:
-            if metadata.get("plan"):
-                tenant.plan = metadata["plan"]
-            if metadata.get("billing_cycle"):
-                tenant.billing_cycle = metadata["billing_cycle"]
             subscription_id = data_object.get("subscription") or data_object.get("id")
-            if subscription_id:
-                tenant.stripe_subscription_id = subscription_id
             status_value = data_object.get("status")
-            if status_value:
-                tenant.subscription_status = status_value
-            db.commit()
+
+            if metadata.get("kind") == "module_purchase":
+                # Acquisto singolo di un modulo (Fase 9.2): non tocca il piano del
+                # tenant, attiva solo quel modulo specifico. activated_by="purchased"
+                # lo distingue da un'autoattivazione entro il piano o per settore.
+                module_slug = metadata.get("module_slug")
+                if module_slug:
+                    existing = db.query(models.TenantModuleActivation).filter(
+                        models.TenantModuleActivation.tenant_id == tenant.id,
+                        models.TenantModuleActivation.module_id == module_slug,
+                    ).first()
+                    if existing:
+                        existing.activated_by = "purchased"
+                        if subscription_id:
+                            existing.stripe_subscription_id = subscription_id
+                    else:
+                        db.add(models.TenantModuleActivation(
+                            tenant_id=tenant.id, module_id=module_slug,
+                            activated_by="purchased", stripe_subscription_id=subscription_id,
+                        ))
+                    db.commit()
+            else:
+                if metadata.get("plan"):
+                    tenant.plan = metadata["plan"]
+                if metadata.get("billing_cycle"):
+                    tenant.billing_cycle = metadata["billing_cycle"]
+                if subscription_id:
+                    tenant.stripe_subscription_id = subscription_id
+                if status_value:
+                    tenant.subscription_status = status_value
+                db.commit()
     elif event_type == "customer.subscription.deleted":
         subscription_id = data_object.get("id")
         tenant = db.query(models.Tenant).filter(models.Tenant.stripe_subscription_id == subscription_id).first()
@@ -168,5 +190,15 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             tenant.plan = "free"
             tenant.subscription_status = "canceled"
             db.commit()
+        else:
+            # Potrebbe essere la cancellazione di un abbonamento a un singolo
+            # modulo (non del piano principale del tenant): disattiviamo solo
+            # quel modulo, se lo troviamo tramite lo stripe_subscription_id.
+            module_activation = db.query(models.TenantModuleActivation).filter(
+                models.TenantModuleActivation.stripe_subscription_id == subscription_id,
+            ).first()
+            if module_activation:
+                db.delete(module_activation)
+                db.commit()
 
     return {"received": True}
