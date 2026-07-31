@@ -1,5 +1,4 @@
 """Router M8 - Email Marketing & Follow-up."""
-import random
 from typing import List
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +7,8 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
+from ..email_sender import EmailSendError, send_email
+from ..import_utils import looks_like_email
 
 router = APIRouter(prefix="/email", tags=["Email Marketing"])
 
@@ -39,6 +40,21 @@ def create_campaign(payload: schemas.EmailCampaignCreate, db: Session = Depends(
     return camp
 
 
+def _collect_recipient_emails(db: Session, tenant_id: str) -> List[str]:
+    """Costruisce la lista destinatari di una campagna: unione di Clienti e
+    Rubrica del tenant con un'email dall'aspetto valido, deduplicata
+    (case-insensitive) — così un contatto già presente anche come cliente
+    (vedi client_import_router._upsert_linked_contact) riceve una sola email."""
+    emails = set()
+    for row in db.query(models.Client.email).filter(models.Client.tenant_id == tenant_id).all():
+        if row[0] and looks_like_email(row[0]):
+            emails.add(row[0].strip().lower())
+    for row in db.query(models.Contact.email).filter(models.Contact.tenant_id == tenant_id).all():
+        if row[0] and looks_like_email(row[0]):
+            emails.add(row[0].strip().lower())
+    return sorted(emails)
+
+
 @router.post("/campaigns/{camp_id}/send", response_model=schemas.EmailCampaignOut)
 def send_campaign(camp_id: str, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     camp = db.query(models.EmailCampaign).filter(
@@ -46,17 +62,35 @@ def send_campaign(camp_id: str, db: Session = Depends(get_db), user: models.User
     ).first()
     if not camp:
         raise HTTPException(status_code=404, detail="Campagna non trovata")
-        
-    # Ottieni il numero di contatti/clienti del tenant per simulare l'invio
-    clients_count = db.query(models.Client).filter(models.Client.tenant_id == user.tenant_id).count()
-    if clients_count == 0:
-        clients_count = 15  # Fallback a 15 invii se non ci sono contatti
-        
-    # Simula statistiche di invio, apertura e click credibili (es: open rate 20-40%, click rate 5-15%)
-    camp.sent_count = clients_count
-    camp.open_count = int(clients_count * random.uniform(0.2, 0.45))
-    camp.click_count = int(camp.open_count * random.uniform(0.1, 0.3))
-    
+
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == user.tenant_id).first()
+    if not tenant or not tenant.smtp_configured:
+        raise HTTPException(
+            status_code=400,
+            detail="Configura il tuo server SMTP in Impostazioni prima di inviare una campagna.",
+        )
+
+    recipients = _collect_recipient_emails(db, user.tenant_id)
+    if not recipients:
+        raise HTTPException(
+            status_code=400,
+            detail="Nessun destinatario con email valida trovato tra Clienti e Rubrica.",
+        )
+
+    sent = failed = 0
+    for to_email in recipients:
+        try:
+            send_email(tenant, to_email, camp.subject, camp.body_html)
+            sent += 1
+        except EmailSendError:
+            failed += 1
+
+    camp.sent_count = sent
+    camp.failed_count = failed
+    camp.open_count = 0
+    camp.click_count = 0
+    camp.status = "sent" if sent > 0 else "failed"
+
     db.commit()
     db.refresh(camp)
     return camp

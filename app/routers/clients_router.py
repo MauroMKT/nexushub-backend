@@ -12,6 +12,56 @@ from ..database import get_db
 router = APIRouter(prefix="/clients", tags=["CRM Core - Clienti"])
 
 
+# ---------- Da Rubrica a Cliente (Fase 9.8) ----------
+@router.post("/from-contact/{contact_id}", response_model=schemas.ClientOut)
+def create_client_from_contact(contact_id: str, db: Session = Depends(get_db),
+                                user: models.User = Depends(get_current_user)):
+    """Porta un nominativo dalla Rubrica ai Clienti: crea un nuovo Cliente a
+    partire dai dati del Contatto e collega i due record (Contact.client_id),
+    così il contatto compare da subito come "cliente" anche in Rubrica —
+    stesso collegamento bidirezionale creato dall'import CSV (Fase 9.6), qui
+    innescato manualmente dall'utente invece che da un file.
+    Idempotente: se il contatto è già collegato a un cliente, restituisce
+    quello esistente invece di crearne un duplicato."""
+    contact = db.query(models.Contact).filter(
+        models.Contact.id == contact_id, models.Contact.tenant_id == user.tenant_id
+    ).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contatto non trovato")
+
+    if contact.client_id:
+        existing = db.query(models.Client).filter(
+            models.Client.id == contact.client_id, models.Client.tenant_id == user.tenant_id
+        ).first()
+        if existing:
+            return existing
+
+    client = models.Client(
+        tenant_id=user.tenant_id,
+        name=contact.full_name,
+        company=contact.company,
+        email=contact.email,
+        phone=contact.phone or contact.mobile,
+        whatsapp=contact.whatsapp,
+        notes=contact.notes,
+        extra_fields=contact.extra_fields,
+    )
+    db.add(client)
+    db.flush()  # serve client.id prima di collegarlo al contatto
+
+    contact.client_id = client.id
+    contact.category = "cliente"
+
+    db.commit()
+    db.refresh(client)
+
+    run_automation(db, user.tenant_id, "new_client", {
+        "client_id": client.id, "client_name": client.name, "owner_user_id": user.id,
+    })
+
+    return client
+
+
 @router.get("", response_model=List[schemas.ClientOut])
 def list_clients(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     return db.query(models.Client).filter(models.Client.tenant_id == user.tenant_id).all()
