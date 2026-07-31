@@ -11,11 +11,36 @@ in un dizionario "_extra" per riga, che i router salvano in una colonna
 extra_fields (JSON) sul record creato/aggiornato — così un CSV con colonne
 impreviste non perde dati, e quelle colonne restano visibili in UI invece di
 sparire.
+
+Fase 9.6: i CSV "reali" esportati da Excel/Numbers in locale IT spesso usano
+";" come delimitatore invece di "," e hanno una o più righe di titolo/metadati
+prima della vera riga di intestazione (es. "Tabella 1" / "NOME AZIENDA — CRM
+export | 550 contatti | ..."). Prima questi file venivano interpretati con la
+prima riga come header e "," come delimitatore fissi: risultato, ogni riga
+finiva scartata perché nessun campo noto veniva riconosciuto. Ora il
+delimitatore e la vera riga di header vengono rilevati automaticamente (vedi
+_detect_csv_layout), sempre e per qualunque tenant dato che la logica vive qui
+e non nel singolo router.
 """
 import csv
 import io
 import json
+import re
 import xml.etree.ElementTree as ET
+
+# Fase 9.6: file reali spesso hanno placeholder tipo "verificare sito" o
+# "form sito" nella colonna email invece di un indirizzo vero (frequente
+# quando i dati vengono da ricerche manuali/outreach). Se li trattassimo come
+# email valide per il match dei duplicati in fase di commit, decine di
+# aziende diverse con lo stesso placeholder verrebbero scambiate per
+# duplicati l'una dell'altra e "sparirebbero" dall'import. Il valore viene
+# comunque salvato così com'è nel campo email (non è un errore da bloccare),
+# semplicemente non viene usato come chiave di identità.
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def looks_like_email(value) -> bool:
+    return bool(value) and bool(_EMAIL_RE.match(str(value).strip()))
 
 # Alias riconosciuti per i campi Cliente, case-insensitive: permette di
 # importare file con intestazioni sia in italiano sia in inglese senza che
@@ -27,8 +52,11 @@ CLIENT_FIELD_ALIASES = {
     "phone": "phone", "telefono": "phone", "tel": "phone",
     "whatsapp": "whatsapp",
     "sector": "sector", "settore": "sector",
+    # Fase 9.6: Client.notes esiste già in DB ma finora l'import non lo
+    # popolava mai — le colonne "Note"/"Notes" finivano in extra_fields.
+    "notes": "notes", "note": "notes",
 }
-CLIENT_KNOWN_FIELDS = ("name", "company", "email", "phone", "whatsapp", "sector")
+CLIENT_KNOWN_FIELDS = ("name", "company", "email", "phone", "whatsapp", "sector", "notes")
 
 # Stessa idea per i campi Contatto (Rubrica, Fase 9.5).
 CONTACT_FIELD_ALIASES = {
@@ -46,6 +74,49 @@ CONTACT_KNOWN_FIELDS = ("full_name", "phone", "mobile", "whatsapp", "email", "co
 # Retro-compatibilità: nomi storici usati finora dal router import clienti.
 FIELD_ALIASES = CLIENT_FIELD_ALIASES
 KNOWN_FIELDS = CLIENT_KNOWN_FIELDS
+
+# --- Rilevamento automatico di delimitatore e riga di header nei CSV (Fase 9.6) ---
+_CSV_DELIMITER_CANDIDATES = (",", ";", "\t", "|")
+_HEADER_SCAN_LINES = 25  # righe di preambolo "ragionevoli" da tollerare prima dell'header
+
+
+def _score_header_line(line: str, delimiter: str, field_aliases: dict) -> int:
+    """Quante celle di questa riga, spezzata con questo delimitatore,
+    corrispondono a un alias noto? Usato per capire QUALE riga è l'header
+    vero e QUALE delimitatore usa il file, senza chiederlo all'utente."""
+    try:
+        cells = next(csv.reader([line], delimiter=delimiter))
+    except (csv.Error, StopIteration):
+        return 0
+    score = 0
+    for cell in cells:
+        key = (cell or "").strip().lower()
+        if key and key in field_aliases:
+            score += 1
+    return score
+
+
+def _detect_csv_layout(content: str, field_aliases: dict):
+    """Ritorna (delimiter, header_line_index) per la riga con più corrispondenze
+    di campi noti tra le prime _HEADER_SCAN_LINES righe non vuote, o None se
+    nessuna riga ha nemmeno un campo riconoscibile (allora il chiamante ricade
+    sul comportamento storico: prima riga come header, "," come delimitatore)."""
+    lines = content.splitlines()
+    best = None  # (score, -line_index), delimiter, line_index
+    for idx, line in enumerate(lines[:_HEADER_SCAN_LINES]):
+        if not line.strip():
+            continue
+        for delim in _CSV_DELIMITER_CANDIDATES:
+            score = _score_header_line(line, delim, field_aliases)
+            if score == 0:
+                continue
+            key = (score, -idx)
+            if best is None or key > best[0]:
+                best = (key, delim, idx)
+    if best is None:
+        return None
+    _, delim, idx = best
+    return delim, idx
 
 
 def _normalize_row(raw: dict, field_aliases: dict) -> tuple[dict, dict]:
@@ -98,11 +169,27 @@ def parse_import_content(
     raw_rows: list = []
 
     if fmt == "csv":
+        layout = _detect_csv_layout(content, field_aliases)
+        delim, header_idx = layout if layout else (",", 0)
+
+        lines = content.splitlines()
+        body = "\n".join(lines[header_idx:])
         try:
-            reader = csv.DictReader(io.StringIO(content))
-            raw_rows = [dict(r) for r in reader]
+            rows_raw = list(csv.reader(io.StringIO(body), delimiter=delim))
         except csv.Error as e:
             return [], [f"CSV non valido: {e}"]
+
+        if rows_raw:
+            header_cells = [(c or "").strip() for c in rows_raw[0]]
+            for r in rows_raw[1:]:
+                if not any((c or "").strip() for c in r):
+                    continue  # riga completamente vuota, capita spesso a fine file
+                row = {}
+                for i, col_name in enumerate(header_cells):
+                    if not col_name:
+                        continue
+                    row[col_name] = r[i] if i < len(r) else None
+                raw_rows.append(row)
 
     elif fmt == "json":
         try:

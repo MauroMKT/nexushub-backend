@@ -718,6 +718,9 @@ class ClientImportRow(BaseModel):
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
     sector: Optional[str] = None
+    # Fase 9.6: Client.notes esiste in DB da sempre ma l'import non lo
+    # popolava — vedi CLIENT_FIELD_ALIASES in import_utils.py.
+    notes: Optional[str] = None
     # Fase 9.5: colonne del file senza corrispondenza nello schema fisso,
     # mostrate in anteprima così l'utente vede cosa verrà salvato in extra_fields.
     extra_fields: Optional[dict] = None
@@ -735,6 +738,12 @@ class ClientImportResultOut(BaseModel):
     updated: int
     skipped: int
     errors: List[str]
+    # Fase 9.6: ogni cliente creato/aggiornato da questo import genera o
+    # aggiorna anche un contatto collegato in Rubrica (vedi
+    # client_import_router.py) — questi due contatori lo rendono visibile
+    # nel riepilogo invece di essere un effetto collaterale silenzioso.
+    contacts_created: int = 0
+    contacts_updated: int = 0
 
 
 # --- Import Rubrica/Contatti da CSV/JSON/XML (Fase 9.5) ---
