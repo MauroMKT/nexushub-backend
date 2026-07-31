@@ -13,7 +13,7 @@ from .. import models, schemas
 from ..auth import create_access_token, hash_password, require_platform_admin
 from ..config import settings
 from ..database import get_db
-from ..modules_catalog import MODULE_BY_SLUG, MODULE_CATALOG, plan_meets_minimum
+from ..modules_catalog import MODULE_BY_SLUG, MODULE_CATALOG, i18n_kwargs, plan_meets_minimum
 from ..tenant_deletion import hard_delete_tenant
 
 router = APIRouter(prefix="/platform-admin", tags=["Super Admin"])
@@ -208,6 +208,8 @@ def list_tenant_modules(tenant_id: str, db: Session = Depends(get_db),
             slug=m["slug"], sector_group=m["sector_group"], min_plan=m["min_plan"],
             name_it=m["name_it"], name_en=m["name_en"],
             is_active_for_tenant=m["slug"] in active_slugs, unlocked=True,
+            record_label_it=m.get("record_label_it"), record_label_en=m.get("record_label_en"),
+            **i18n_kwargs(m),
         )
         for m in MODULE_CATALOG
     ]

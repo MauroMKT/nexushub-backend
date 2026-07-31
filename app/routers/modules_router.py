@@ -19,7 +19,7 @@ from ..auth import get_current_user, require_admin
 from ..config import settings
 from ..database import get_db
 from ..modules_catalog import (DEDICATED_ROUTES, MODULE_BY_SLUG, MODULE_CATALOG,
-                                plan_meets_minimum)
+                                i18n_kwargs, plan_meets_minimum)
 
 router = APIRouter(prefix="/modules", tags=["Moduli di settore"])
 
@@ -47,6 +47,7 @@ def _catalog_for_tenant(db: Session, tenant: models.Tenant) -> List[schemas.Modu
             purchased_standalone=bool(activation and activation.activated_by == "purchased"),
             record_label_it=m.get("record_label_it"),
             record_label_en=m.get("record_label_en"),
+            **i18n_kwargs(m),
         ))
     return items
 
@@ -67,6 +68,8 @@ def get_public_catalog():
     return [
         schemas.ModulePublicCatalogItem(
             slug=m["slug"], sector_group=m["sector_group"], name_it=m["name_it"], name_en=m["name_en"],
+            record_label_it=m.get("record_label_it"), record_label_en=m.get("record_label_en"),
+            **i18n_kwargs(m),
         )
         for m in MODULE_CATALOG
     ]
