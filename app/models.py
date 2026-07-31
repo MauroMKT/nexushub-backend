@@ -530,3 +530,19 @@ class InvoiceLine(Base):
     vat_rate = Column(Float, default=22)  # percentuale, default aliquota IVA italiana ordinaria
 
     invoice = relationship("Invoice", back_populates="lines")
+
+
+# ---------- Moduli di settore attivabili (Fase 9) ----------
+class TenantModuleActivation(Base):
+    """Modulo di settore attivo per un tenant specifico. Il catalogo dei moduli
+    disponibili è statico (vedi modules_catalog.py); questa tabella registra solo
+    QUALI moduli sono accesi per QUALE tenant. module_id è lo slug stabile del
+    modulo (es. "studi_medici"), non una foreign key verso una tabella catalogo,
+    per restare coerente con l'approccio "catalogo in codice" del progetto."""
+    __tablename__ = "tenant_module_activations"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    module_id = Column(String, nullable=False, index=True)
+    activated_at = Column(DateTime, default=datetime.utcnow)
+    activated_by = Column(String, default="admin")  # "admin" (autoattivazione) | "platform_admin" (Super Admin)

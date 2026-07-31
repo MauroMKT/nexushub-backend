@@ -138,6 +138,13 @@ class UserProfileUpdate(BaseModel):
     new_password: Optional[str] = None
 
 
+class TenantSelfDelete(BaseModel):
+    """Richiesta di cancellazione permanente e irreversibile del proprio account,
+    da parte dell'amministratore del tenant. La password è richiesta come
+    conferma per evitare cancellazioni accidentali o da sessioni compromesse."""
+    password: str
+
+
 # ---------- Clients / Tags / Deals (M1) ----------
 class TagOut(BaseModel):
     id: str
@@ -825,3 +832,23 @@ class IncomeStatementOut(BaseModel):
     revenue: BalanceSheetSection
     expenses: BalanceSheetSection
     net_income: float
+
+
+# ---------- Moduli di settore attivabili (Fase 9) ----------
+class ModuleCatalogItem(BaseModel):
+    slug: str
+    sector_group: str
+    min_plan: str
+    name_it: str
+    name_en: str
+    is_active_for_tenant: bool = False
+    unlocked: bool = True  # False se il piano del tenant non raggiunge min_plan
+
+
+class TenantModuleActivationOut(BaseModel):
+    module_id: str
+    activated_at: datetime
+    activated_by: str
+
+    class Config:
+        from_attributes = True

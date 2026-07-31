@@ -17,7 +17,7 @@ from .routers import (appointments_router, auth_router, clients_router,
                        contacts_router, notifications_router, client_portal_router,
                        google_calendar_router, platform_admin_router, billing_router,
                        chat_router, client_chat_router, client_documents_router,
-                       client_import_router, accounting_router)
+                       client_import_router, accounting_router, modules_router)
 
 Base.metadata.create_all(bind=engine)
 
@@ -96,6 +96,7 @@ app.include_router(client_documents_router.team_router)
 app.include_router(client_documents_router.portal_router)
 app.include_router(client_import_router.router)
 app.include_router(accounting_router.router)
+app.include_router(modules_router.router)
 
 
 @app.get("/")
