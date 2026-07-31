@@ -49,5 +49,11 @@ class Settings(BaseSettings):
     stripe_price_enterprise_monthly: str = os.getenv("STRIPE_PRICE_ENTERPRISE_MONTHLY", "")
     stripe_price_enterprise_annual: str = os.getenv("STRIPE_PRICE_ENTERPRISE_ANNUAL", "")
 
+    # --- Acquisto singolo di un modulo di settore (Fase 9.2) ---
+    # Un solo price Stripe condiviso da tutti i moduli acquistabili singolarmente:
+    # più semplice da configurare di 24 price distinti; se in futuro servissero
+    # prezzi diversi per modulo si può sostituire con un dizionario slug -> price_id.
+    stripe_price_module_addon: str = os.getenv("STRIPE_PRICE_MODULE_ADDON", "")
+
 
 settings = Settings()

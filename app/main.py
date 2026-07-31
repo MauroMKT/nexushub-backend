@@ -17,7 +17,9 @@ from .routers import (appointments_router, auth_router, clients_router,
                        contacts_router, notifications_router, client_portal_router,
                        google_calendar_router, platform_admin_router, billing_router,
                        chat_router, client_chat_router, client_documents_router,
-                       client_import_router, accounting_router, modules_router)
+                       client_import_router, accounting_router, modules_router,
+                       engineering_router, agency_router, realestate_router,
+                       hospitality_router)
 
 Base.metadata.create_all(bind=engine)
 
@@ -33,6 +35,9 @@ _TENANT_COLUMN_MIGRATIONS = [
     # ora è testo libero perché le forme giuridiche variano da paese a paese.
     # Idempotente: se la colonna è già VARCHAR il cast è un no-op innocuo.
     "ALTER TABLE tenants ALTER COLUMN company_type TYPE VARCHAR USING company_type::text",
+    # Fase 9.2: traccia l'abbonamento Stripe dedicato quando un modulo viene
+    # acquistato singolarmente (indipendente dal piano del tenant).
+    "ALTER TABLE tenant_module_activations ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:
@@ -97,6 +102,10 @@ app.include_router(client_documents_router.portal_router)
 app.include_router(client_import_router.router)
 app.include_router(accounting_router.router)
 app.include_router(modules_router.router)
+app.include_router(engineering_router.router)
+app.include_router(agency_router.router)
+app.include_router(realestate_router.router)
+app.include_router(hospitality_router.router)
 
 
 @app.get("/")
@@ -107,5 +116,3 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
-
-

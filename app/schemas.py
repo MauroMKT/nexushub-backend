@@ -843,12 +843,201 @@ class ModuleCatalogItem(BaseModel):
     name_en: str
     is_active_for_tenant: bool = False
     unlocked: bool = True  # False se il piano del tenant non raggiunge min_plan
+    has_dedicated_feature: bool = False  # True se ha una pagina propria (non solo etichetta)
+    dedicated_route: Optional[str] = None  # rotta frontend della pagina dedicata, se presente
+    purchased_standalone: bool = False  # True se attivo tramite acquisto singolo (Fase 9.2), non piano
 
 
 class TenantModuleActivationOut(BaseModel):
     module_id: str
     activated_at: datetime
     activated_by: str
+
+    class Config:
+        from_attributes = True
+
+
+class ModulePublicCatalogItem(BaseModel):
+    """Voce di catalogo minimale, senza dati legati a un tenant: usata dalla pagina
+    di registrazione (non autenticata) per il menu a tendina "Settore"."""
+    slug: str
+    sector_group: str
+    name_it: str
+    name_en: str
+
+
+# ---------- Moduli pilota con funzionalità dedicata (Fase 9.1) ----------
+class EngineeringProjectCreate(BaseModel):
+    title: str
+    client_id: Optional[str] = None
+    phase: str = "progettazione"
+    deadline: Optional[datetime] = None
+    budget: float = 0
+    notes: Optional[str] = None
+
+
+class EngineeringProjectUpdate(BaseModel):
+    title: Optional[str] = None
+    client_id: Optional[str] = None
+    phase: Optional[str] = None
+    deadline: Optional[datetime] = None
+    budget: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class EngineeringProjectOut(BaseModel):
+    id: str
+    title: str
+    client_id: Optional[str]
+    client_name: Optional[str] = None
+    phase: str
+    deadline: Optional[datetime]
+    budget: float
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AgencyProjectCreate(BaseModel):
+    title: str
+    client_id: Optional[str] = None
+    status: str = "in_corso"
+    is_retainer: bool = False
+    retainer_monthly: Optional[float] = None
+    hours_budget: Optional[float] = None
+    hours_logged: float = 0
+    notes: Optional[str] = None
+
+
+class AgencyProjectUpdate(BaseModel):
+    title: Optional[str] = None
+    client_id: Optional[str] = None
+    status: Optional[str] = None
+    is_retainer: Optional[bool] = None
+    retainer_monthly: Optional[float] = None
+    hours_budget: Optional[float] = None
+    hours_logged: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class AgencyProjectOut(BaseModel):
+    id: str
+    title: str
+    client_id: Optional[str]
+    client_name: Optional[str] = None
+    status: str
+    is_retainer: bool
+    retainer_monthly: Optional[float]
+    hours_budget: Optional[float]
+    hours_logged: float
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RealEstatePropertyCreate(BaseModel):
+    title: str
+    client_id: Optional[str] = None
+    property_type: str = "residenziale"
+    address: Optional[str] = None
+    size_sqm: Optional[float] = None
+    price: Optional[float] = None
+    status: str = "disponibile"
+    notes: Optional[str] = None
+
+
+class RealEstatePropertyUpdate(BaseModel):
+    title: Optional[str] = None
+    client_id: Optional[str] = None
+    property_type: Optional[str] = None
+    address: Optional[str] = None
+    size_sqm: Optional[float] = None
+    price: Optional[float] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class RealEstatePropertyOut(BaseModel):
+    id: str
+    title: str
+    client_id: Optional[str]
+    client_name: Optional[str] = None
+    property_type: str
+    address: Optional[str]
+    size_sqm: Optional[float]
+    price: Optional[float]
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReservationCreate(BaseModel):
+    client_id: Optional[str] = None
+    guest_name: Optional[str] = None
+    party_size: int = 2
+    table_label: Optional[str] = None
+    reservation_time: datetime
+    status: str = "confirmed"
+    notes: Optional[str] = None
+
+
+class ReservationUpdate(BaseModel):
+    client_id: Optional[str] = None
+    guest_name: Optional[str] = None
+    party_size: Optional[int] = None
+    table_label: Optional[str] = None
+    reservation_time: Optional[datetime] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ReservationOut(BaseModel):
+    id: str
+    client_id: Optional[str]
+    client_name: Optional[str] = None
+    guest_name: Optional[str]
+    party_size: int
+    table_label: Optional[str]
+    reservation_time: datetime
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MenuItemCreate(BaseModel):
+    name: str
+    category: str = "altro"
+    price: float = 0
+    description: Optional[str] = None
+    is_available: bool = True
+
+
+class MenuItemUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    price: Optional[float] = None
+    description: Optional[str] = None
+    is_available: Optional[bool] = None
+
+
+class MenuItemOut(BaseModel):
+    id: str
+    name: str
+    category: str
+    price: float
+    description: Optional[str]
+    is_available: bool
+    created_at: datetime
 
     class Config:
         from_attributes = True

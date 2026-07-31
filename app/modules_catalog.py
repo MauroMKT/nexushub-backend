@@ -25,9 +25,16 @@ MODULE_CATALOG = [
     {"slug": "studi_medici", "sector_group": "Salute", "min_plan": "premium",
      "name_it": "Studi Medici", "name_en": "Medical Practices"},
 
+    # --- Ingegneria & Tecnico ---
+    {"slug": "servizi_ingegneria", "sector_group": "Ingegneria & Tecnico", "min_plan": "premium",
+     "name_it": "Servizi di Ingegneria", "name_en": "Engineering Services",
+     # Modulo pilota (Fase 9.1) con funzionalità dedicata: vedi engineering_router.py.
+     "has_dedicated_feature": True},
+
     # --- Immobiliare ---
     {"slug": "agenzie_immobiliari", "sector_group": "Immobiliare", "min_plan": "premium",
-     "name_it": "Agenzie Immobiliari", "name_en": "Real Estate Agencies"},
+     "name_it": "Agenzie Immobiliari", "name_en": "Real Estate Agencies",
+     "has_dedicated_feature": True},
 
     # --- Legale & Contabilità ---
     {"slug": "studi_legali", "sector_group": "Legale & Contabilità", "min_plan": "premium",
@@ -47,19 +54,25 @@ MODULE_CATALOG = [
 
     # --- Marketing & IT ---
     {"slug": "servizi_marketing", "sector_group": "Marketing & IT", "min_plan": "premium",
-     "name_it": "Agenzie di Servizi di Marketing", "name_en": "Marketing Services Agencies"},
+     "name_it": "Agenzie di Servizi di Marketing", "name_en": "Marketing Services Agencies",
+     "has_dedicated_feature": True},
     {"slug": "servizi_it", "sector_group": "Marketing & IT", "min_plan": "premium",
-     "name_it": "Agenzie di Servizi IT", "name_en": "IT Services Agencies"},
+     "name_it": "Agenzie di Servizi IT", "name_en": "IT Services Agencies",
+     "has_dedicated_feature": True},
 
     # --- Ristorazione & Hospitality ---
     {"slug": "ristorazione", "sector_group": "Ristorazione & Hospitality", "min_plan": "premium",
-     "name_it": "Ristoranti, Pizzerie, Kebab, Paninoteche, Pub con Cucina", "name_en": "Restaurants & Food Venues"},
+     "name_it": "Ristoranti, Pizzerie, Kebab, Paninoteche, Pub con Cucina", "name_en": "Restaurants & Food Venues",
+     "has_dedicated_feature": True},
     {"slug": "bar_bistrot", "sector_group": "Ristorazione & Hospitality", "min_plan": "premium",
-     "name_it": "Bar, Bistrot", "name_en": "Bars & Bistros"},
+     "name_it": "Bar, Bistrot", "name_en": "Bars & Bistros",
+     "has_dedicated_feature": True},
     {"slug": "locali_notturni", "sector_group": "Ristorazione & Hospitality", "min_plan": "premium",
-     "name_it": "Pub, Discoteche, Locali Notturni", "name_en": "Pubs, Clubs & Nightlife"},
+     "name_it": "Pub, Discoteche, Locali Notturni", "name_en": "Pubs, Clubs & Nightlife",
+     "has_dedicated_feature": True},
     {"slug": "hotel", "sector_group": "Ristorazione & Hospitality", "min_plan": "enterprise",
-     "name_it": "Hotel, Residence, Resort", "name_en": "Hotels & Resorts"},
+     "name_it": "Hotel, Residence, Resort", "name_en": "Hotels & Resorts",
+     "has_dedicated_feature": True},
 
     # --- Cura della persona ---
     {"slug": "barbieri_parrucchieri", "sector_group": "Cura della persona", "min_plan": "premium",
@@ -101,3 +114,19 @@ MODULE_CATALOG = [
 ]
 
 MODULE_BY_SLUG = {m["slug"]: m for m in MODULE_CATALOG}
+
+# Rotta frontend dedicata per i moduli pilota con funzionalità propria (Fase 9.1):
+# più moduli/settori affini possono condividere la stessa pagina (es. Marketing e
+# IT hanno entrambi "progetti cliente"; i quattro moduli di Ristorazione &
+# Hospitality condividono tavoli/prenotazioni). I moduli senza voce qui restano
+# "solo etichetta" attivabile, senza una pagina propria (in attesa di sviluppo).
+DEDICATED_ROUTES = {
+    "servizi_ingegneria": "/engineering",
+    "agenzie_immobiliari": "/real-estate",
+    "servizi_marketing": "/agency-projects",
+    "servizi_it": "/agency-projects",
+    "ristorazione": "/hospitality",
+    "bar_bistrot": "/hospitality",
+    "locali_notturni": "/hospitality",
+    "hotel": "/hospitality",
+}

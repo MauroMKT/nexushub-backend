@@ -545,4 +545,112 @@ class TenantModuleActivation(Base):
     tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
     module_id = Column(String, nullable=False, index=True)
     activated_at = Column(DateTime, default=datetime.utcnow)
-    activated_by = Column(String, default="admin")  # "admin" (autoattivazione) | "platform_admin" (Super Admin)
+    # "admin" (autoattivazione entro il piano) | "platform_admin" (Super Admin) |
+    # "auto_sector" (attivato in automatico alla registrazione in base al settore
+    # dichiarato) | "purchased" (acquisto ricorrente del singolo modulo, Fase 9.2)
+    activated_by = Column(String, default="admin")
+    # Valorizzato solo se activated_by == "purchased": permette di risalire
+    # all'abbonamento Stripe dedicato a questo modulo per gestirne la cancellazione.
+    stripe_subscription_id = Column(String, nullable=True)
+
+
+# ---------- Moduli pilota con funzionalità dedicata (Fase 9.1) ----------
+class EngineeringProjectPhase(str, enum.Enum):
+    progettazione = "progettazione"
+    permessi = "permessi"
+    esecuzione = "esecuzione"
+    collaudo = "collaudo"
+    chiuso = "chiuso"
+
+
+class EngineeringProject(Base):
+    """Commessa tecnica del modulo "Servizi di Ingegneria" (Fase 9.1)."""
+    __tablename__ = "engineering_projects"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=True)
+    title = Column(String, nullable=False)
+    phase = Column(Enum(EngineeringProjectPhase), default=EngineeringProjectPhase.progettazione)
+    deadline = Column(DateTime, nullable=True)
+    budget = Column(Float, default=0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = relationship("Client")
+
+
+class AgencyProject(Base):
+    """Progetto cliente del modulo "Servizi IT & Marketing" (Fase 9.1): milestone,
+    stato ed eventuale retainer mensile e monte ore, per agenzie di marketing o IT."""
+    __tablename__ = "agency_projects"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=True)
+    title = Column(String, nullable=False)
+    status = Column(String, default="in_corso")  # in_corso | in_pausa | completato
+    is_retainer = Column(Boolean, default=False)
+    retainer_monthly = Column(Float, nullable=True)
+    hours_budget = Column(Float, nullable=True)
+    hours_logged = Column(Float, default=0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = relationship("Client")
+
+
+class RealEstateProperty(Base):
+    """Immobile in portafoglio del modulo "Agenzie Immobiliari" (Fase 9.1)."""
+    __tablename__ = "real_estate_properties"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=True)  # proprietario o interessato
+    title = Column(String, nullable=False)
+    property_type = Column(String, default="residenziale")  # residenziale | commerciale | terreno | garage | altro
+    address = Column(String, nullable=True)
+    size_sqm = Column(Float, nullable=True)
+    price = Column(Float, nullable=True)
+    status = Column(String, default="disponibile")  # disponibile | in_trattativa | venduto | affittato
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = relationship("Client")
+
+
+class Reservation(Base):
+    """Prenotazione del modulo "Ristorazione & Hospitality" (Fase 9.1): tavolo per
+    ristoranti/bar/locali, camera per hotel (table_label è testo libero apposta,
+    per coprire entrambi i casi senza due tabelle separate)."""
+    __tablename__ = "reservations"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=True)
+    guest_name = Column(String, nullable=True)  # per ospiti non ancora presenti in anagrafica clienti
+    party_size = Column(Integer, default=2)
+    table_label = Column(String, nullable=True)  # es. "Tavolo 5" oppure "Camera 101"
+    reservation_time = Column(DateTime, nullable=False)
+    status = Column(String, default="confirmed")  # confirmed | seated | completed | cancelled | no_show
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    client = relationship("Client")
+
+
+class MenuItem(Base):
+    """Voce di menu del modulo "Ristorazione & Hospitality" (Fase 9.1)."""
+    __tablename__ = "menu_items"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    category = Column(String, default="altro")  # antipasti | primi | secondi | dolci | bevande | altro
+    price = Column(Float, default=0)
+    description = Column(Text, nullable=True)
+    is_available = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
