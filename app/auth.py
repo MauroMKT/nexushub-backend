@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -44,7 +44,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Credenziali non valide",
@@ -67,6 +67,32 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         tenant = db.query(models.Tenant).filter(models.Tenant.id == user.tenant_id).first()
         if tenant is None or not tenant.is_active:
             raise HTTPException(status_code=403, detail="Account sospeso: contatta l'assistenza")
+
+    # Modalità "Entra come Super Admin" (Fase 7 rivista): il super admin resta
+    # SEMPRE autenticato con il proprio account/token, non fa mai un login con
+    # le credenziali dell'iscritto. Se la richiesta porta l'header
+    # X-View-Tenant-Id (impostato dal frontend solo quando il super admin sta
+    # "visualizzando" un'agenzia cliente), reinterpretiamo la richiesta come se
+    # il tenant_id dell'utente fosse quello del tenant selezionato — SOLO in
+    # memoria per questa singola richiesta, mai scritto sul database.
+    #
+    # db.expunge(user) stacca l'oggetto dalla sessione PRIMA di mutarlo: senza
+    # questo, un qualsiasi db.commit() successivo nella stessa richiesta (anche
+    # per logica di business non collegata) rischierebbe di persistere per
+    # errore il tenant_id finto sull'account reale del super admin.
+    if user.role == models.RoleEnum.platform_admin:
+        view_tenant_id = request.headers.get("X-View-Tenant-Id")
+        if view_tenant_id:
+            target_tenant = db.query(models.Tenant).filter(models.Tenant.id == view_tenant_id).first()
+            if target_tenant is not None:
+                db.expunge(user)
+                user.tenant_id = target_tenant.id
+                # Assegniamo anche la relationship già caricata in memoria: dopo
+                # l'expunge, un accesso lazy a user.tenant (es. whatsapp_router.py)
+                # solleverebbe DetachedInstanceError perché l'oggetto non è più
+                # agganciato alla sessione.
+                user.tenant = target_tenant
+
     return user
 
 
