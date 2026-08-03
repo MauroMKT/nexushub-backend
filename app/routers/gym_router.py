@@ -7,6 +7,7 @@ sociale del club. Stesso pattern base64-in-DB usato per i documenti cliente
 (Fase 8, client_documents_router.py): niente filesystem esterno."""
 import base64
 import binascii
+from datetime import date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +17,7 @@ from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
 from ..module_access import require_module
+from ..notifications import notify_tenant_admins
 
 router = APIRouter(prefix="/gym", tags=["Palestre e Centri Sportivi"])
 
@@ -76,7 +78,7 @@ def _enrollments_out(db: Session, member_id: str) -> List[schemas.GymEnrollmentO
 def _member_to_out(db: Session, member: models.GymMember) -> schemas.GymMemberOut:
     return schemas.GymMemberOut(
         id=member.id, client_id=member.client_id, full_name=member.full_name, phone=member.phone,
-        email=member.email, address=member.address, fiscal_code=member.fiscal_code,
+        email=member.email, address=member.address, birth_date=member.birth_date, fiscal_code=member.fiscal_code,
         vat_number=member.vat_number, card_number=member.card_number,
         federation_card_number=member.federation_card_number,
         medical_certificate_ok=member.medical_certificate_ok,
@@ -106,7 +108,7 @@ def create_member(payload: schemas.GymMemberCreate, db: Session = Depends(get_db
             raise HTTPException(status_code=404, detail="Cliente non trovato")
     member = models.GymMember(
         tenant_id=user.tenant_id, client_id=payload.client_id, full_name=payload.full_name,
-        phone=payload.phone, email=payload.email, address=payload.address,
+        phone=payload.phone, email=payload.email, address=payload.address, birth_date=payload.birth_date,
         fiscal_code=payload.fiscal_code, vat_number=payload.vat_number,
         card_number=payload.card_number, federation_card_number=payload.federation_card_number,
         medical_certificate_ok=payload.medical_certificate_ok,
@@ -429,3 +431,97 @@ def leaderboard(db: Session = Depends(get_db), user: models.User = Depends(_requ
 
     entries.sort(key=lambda e: (-e.total_points, -e.trophies_count, e.full_name))
     return entries
+
+
+# ---------- Compleanni ----------
+def _next_birthday(birth_date: date, today: date) -> date:
+    """Prossima ricorrenza del compleanno a partire da oggi (se è oggi stesso,
+    la ricorrenza restituita è oggi). Il 29 febbraio su un anno non bisestile
+    viene festeggiato il 28 febbraio."""
+    try:
+        candidate = birth_date.replace(year=today.year)
+    except ValueError:
+        candidate = birth_date.replace(year=today.year, day=28)
+    if candidate < today:
+        try:
+            candidate = birth_date.replace(year=today.year + 1)
+        except ValueError:
+            candidate = birth_date.replace(year=today.year + 1, day=28)
+    return candidate
+
+
+def _birthday_marker(member_id: str, on_date: date) -> str:
+    return f"{member_id}:{on_date.isoformat()}"
+
+
+def _maybe_notify_birthday_today(db: Session, tenant_id: str, member: models.GymMember, today: date) -> bool:
+    """Notifica automaticamente il team quando un socio compie gli anni oggi,
+    una sola volta al giorno per socio. Non serve uno scheduler in background:
+    il controllo scatta ogni volta che qualcuno consulta GET /gym/birthdays
+    (es. aprendo la scheda "Compleanni" del modulo), con dedupe sul giorno
+    tramite Notification.related_id."""
+    marker = _birthday_marker(member.id, today)
+    already_sent = db.query(models.Notification).filter(
+        models.Notification.tenant_id == tenant_id,
+        models.Notification.related_type == "gym_birthday",
+        models.Notification.related_id == marker,
+    ).first()
+    if already_sent:
+        return True
+    turning_age = today.year - member.birth_date.year
+    notify_tenant_admins(
+        db, tenant_id,
+        title="🎂 Compleanno oggi",
+        body=f"{member.full_name} compie {turning_age} anni oggi!",
+        related_type="gym_birthday", related_id=marker,
+    )
+    return True
+
+
+@router.get("/birthdays", response_model=List[schemas.GymBirthdayEntryOut])
+def upcoming_birthdays(days_ahead: int = 30, db: Session = Depends(get_db), user: models.User = Depends(_require)):
+    """Prossimi compleanni entro `days_ahead` giorni (default 30), più vicino
+    prima. Chi compie gli anni oggi fa scattare automaticamente la notifica
+    al team (vedi _maybe_notify_birthday_today)."""
+    today = date.today()
+    members = db.query(models.GymMember).filter(
+        models.GymMember.tenant_id == user.tenant_id, models.GymMember.birth_date.isnot(None)
+    ).all()
+
+    entries = []
+    for member in members:
+        next_bday = _next_birthday(member.birth_date, today)
+        days_until = (next_bday - today).days
+        if days_until > days_ahead:
+            continue
+        turning_age = next_bday.year - member.birth_date.year
+        notified_today = _maybe_notify_birthday_today(db, user.tenant_id, member, today) if days_until == 0 else False
+        entries.append(schemas.GymBirthdayEntryOut(
+            member_id=member.id, full_name=member.full_name, card_number=member.card_number,
+            has_photo=bool(member.photo_base64), birth_date=member.birth_date, next_birthday=next_bday,
+            days_until=days_until, turning_age=turning_age, notified_today=notified_today,
+        ))
+
+    entries.sort(key=lambda e: e.days_until)
+    return entries
+
+
+@router.post("/members/{member_id}/birthday-notification")
+def send_birthday_notification(member_id: str, db: Session = Depends(get_db), user: models.User = Depends(_require)):
+    """Invio manuale ed esplicito di una notifica di compleanno al team per un
+    socio (es. per festeggiare in anticipo o rimandare il promemoria), a
+    prescindere dal giorno esatto e senza limiti di dedupe come invece accade
+    per la notifica automatica del giorno stesso."""
+    member = _get_member_or_404(db, user.tenant_id, member_id)
+    if not member.birth_date:
+        raise HTTPException(status_code=400, detail="Il socio non ha una data di nascita registrata")
+    today = date.today()
+    turning_age = _next_birthday(member.birth_date, today).year - member.birth_date.year
+    marker = f"{member.id}:{today.isoformat()}:manual:{models.gen_uuid()[:8]}"
+    notify_tenant_admins(
+        db, user.tenant_id,
+        title="🎂 Promemoria compleanno",
+        body=f"Ricordati di festeggiare {member.full_name} (compie {turning_age} anni)!",
+        related_type="gym_birthday", related_id=marker,
+    )
+    return {"ok": True}
