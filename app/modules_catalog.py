@@ -529,6 +529,11 @@ DEDICATED_ROUTES = {
     "bar_bistrot": "/hospitality",
     "locali_notturni": "/hospitality",
     "hotel": "/hospitality",
+    # Fase 9.9: "palestre" era generico (tabella SectorRecord condivisa, vedi
+    # sotto) — ora ha una pagina bespoke propria (anagrafica soci, corsi con
+    # grado/cintura, certificato medico, foto, classifica sociale), quindi
+    # esce da GENERIC_SECTOR_SLUGS ed entra qui come i 4 moduli pilota di Fase 9.1.
+    "palestre": "/gym",
 }
 
 # Fase 9.3: i restanti settori del catalogo (senza uno schema dati bespoke come

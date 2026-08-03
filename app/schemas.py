@@ -1193,6 +1193,170 @@ class MenuItemOut(BaseModel):
         from_attributes = True
 
 
+# ---------- Modulo pilota: Palestre e Centri Sportivi (Fase 9.9) ----------
+class GymCourseCreate(BaseModel):
+    name: str
+    is_martial_arts: bool = False
+
+
+class GymCourseOut(BaseModel):
+    id: str
+    name: str
+    is_martial_arts: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GymEnrollmentCreate(BaseModel):
+    # O si indica un corso già esistente (course_id), o si passa un nome nuovo
+    # (course_name) che verrà creato al volo — vedi gym_router.py per il
+    # create-if-missing case-insensitive che tiene il catalogo corsi completo.
+    course_id: Optional[str] = None
+    course_name: Optional[str] = None
+    is_martial_arts: bool = False  # usato solo se si sta creando un corso nuovo via course_name
+    grade_name: Optional[str] = None
+    grade_year: Optional[int] = None
+
+
+class GymEnrollmentOut(BaseModel):
+    id: str
+    member_id: str
+    course_id: str
+    course_name: str
+    is_martial_arts: bool
+    grade_name: Optional[str] = None
+    grade_year: Optional[int] = None
+    enrolled_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GymMemberCreate(BaseModel):
+    client_id: Optional[str] = None
+    full_name: str
+    phone: str
+    email: EmailStr
+    address: str
+    fiscal_code: Optional[str] = None
+    vat_number: Optional[str] = None
+    card_number: Optional[str] = None
+    federation_card_number: Optional[str] = None
+    medical_certificate_ok: bool = False
+    medical_certificate_expiry: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class GymMemberUpdate(BaseModel):
+    client_id: Optional[str] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    address: Optional[str] = None
+    fiscal_code: Optional[str] = None
+    vat_number: Optional[str] = None
+    card_number: Optional[str] = None
+    federation_card_number: Optional[str] = None
+    medical_certificate_ok: Optional[bool] = None
+    medical_certificate_expiry: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class GymMemberOut(BaseModel):
+    id: str
+    client_id: Optional[str] = None
+    full_name: str
+    phone: str
+    email: str
+    address: str
+    fiscal_code: Optional[str] = None
+    vat_number: Optional[str] = None
+    card_number: Optional[str] = None
+    federation_card_number: Optional[str] = None
+    medical_certificate_ok: bool
+    medical_certificate_expiry: Optional[datetime] = None
+    has_photo: bool = False
+    notes: Optional[str] = None
+    created_at: datetime
+    enrollments: List[GymEnrollmentOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+class GymPhotoUpload(BaseModel):
+    content_type: str
+    content_base64: str
+
+
+class GymPhotoOut(BaseModel):
+    content_type: str
+    content_base64: str
+
+
+class GymDocumentCreate(BaseModel):
+    doc_type: str = "other"  # medical_certificate | other
+    filename: str
+    content_type: str
+    content_base64: str
+
+
+class GymDocumentOut(BaseModel):
+    id: str
+    member_id: str
+    doc_type: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_by_name: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GymDocumentContentOut(BaseModel):
+    id: str
+    filename: str
+    content_type: str
+    content_base64: str
+
+
+class GymTrophyCreate(BaseModel):
+    title: str
+    placement: Optional[str] = None
+    points: int = 0
+    date_won: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class GymTrophyOut(BaseModel):
+    id: str
+    member_id: str
+    title: str
+    placement: Optional[str] = None
+    points: int
+    date_won: Optional[datetime] = None
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GymLeaderboardEntryOut(BaseModel):
+    """Riga della classifica sociale: un socio con il totale trofei/punti
+    ottenuti, ordinata lato server (punti desc, poi numero trofei desc)."""
+    member_id: str
+    full_name: str
+    card_number: Optional[str] = None
+    has_photo: bool = False
+    trophies_count: int
+    total_points: int
+
+
 # ---------- Moduli di settore "generici" (Fase 9.3) ----------
 class SectorRecordCreate(BaseModel):
     title: str

@@ -686,6 +686,114 @@ class MenuItem(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+# ---------- Modulo pilota: Palestre e Centri Sportivi (Fase 9.9) ----------
+# "palestre" nasceva come modulo "generico" (Fase 9.3, tabella SectorRecord
+# condivisa). Le esigenze richieste (anagrafica socio completa, corsi con
+# grado/cintura per le arti marziali, tessere, certificato medico con upload,
+# foto socio, trofei per una classifica sociale) non entrano nello schema
+# generico a campo singolo "title/status/value" — servono tabelle dedicate,
+# come i 4 moduli pilota bespoke di Fase 9.1. Vedi gym_router.py e
+# DEDICATED_ROUTES["palestre"] in modules_catalog.py.
+class GymMember(Base):
+    """Socio/atleta della palestra. client_id è opzionale: un socio può esistere
+    anche senza essere (ancora) un Cliente CRM in senso commerciale."""
+    __tablename__ = "gym_members"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=True)
+    full_name = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    address = Column(String, nullable=False)
+    fiscal_code = Column(String, nullable=True)  # codice fiscale, opzionale
+    vat_number = Column(String, nullable=True)  # partita IVA, opzionale (es. personal trainer con P.IVA)
+    card_number = Column(String, nullable=True)  # numero tessera del club
+    federation_card_number = Column(String, nullable=True)  # numero tessera della federazione affiliata
+    medical_certificate_ok = Column(Boolean, default=False)  # check rapido si/no, indipendente dal file caricato
+    medical_certificate_expiry = Column(DateTime, nullable=True)
+    photo_base64 = Column(Text, nullable=True)
+    photo_content_type = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = relationship("Client")
+
+
+class GymCourse(Base):
+    """Corso offerto dalla palestra (es. "Karate", "Nuoto", "Pilates"). Catalogo
+    estendibile dall'utente stesso al momento dell'iscrizione di un socio (vedi
+    gym_router.py: create-if-missing per nome, case-insensitive), così il
+    database dei corsi resta sempre completo senza un censimento preventivo."""
+    __tablename__ = "gym_courses"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    is_martial_arts = Column(Boolean, default=False)  # abilita grado/cintura + anno nelle iscrizioni
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class GymEnrollment(Base):
+    """Iscrizione di un socio a un corso. grade_name/grade_year hanno senso solo
+    se il corso è di arti marziali (course.is_martial_arts), ma restano colonne
+    libere qui invece che vincolate a un enum: gradi/cinture cambiano da
+    disciplina a disciplina (cinture nel judo/karate, "dan"/"kyu", gradi nel
+    ju-jitsu brasiliano, ecc.)."""
+    __tablename__ = "gym_enrollments"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    member_id = Column(String, ForeignKey("gym_members.id"), nullable=False, index=True)
+    course_id = Column(String, ForeignKey("gym_courses.id"), nullable=False, index=True)
+    grade_name = Column(String, nullable=True)  # es. "Cintura Nera 1° Dan"
+    grade_year = Column(Integer, nullable=True)  # anno di decorrenza del grado
+    enrolled_at = Column(DateTime, default=datetime.utcnow)
+
+    member = relationship("GymMember")
+    course = relationship("GymCourse")
+
+
+class GymDocument(Base):
+    """Documento legato a un socio: certificato medico (doc_type="medical_certificate",
+    solo PDF o foto, vedi validazione in gym_router.py) o altro documento libero
+    (doc_type="other"). Stesso pattern base64-in-DB di ClientDocument (Fase 8),
+    per coerenza e perché il filesystem del container non è persistente su Railway."""
+    __tablename__ = "gym_documents"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    member_id = Column(String, ForeignKey("gym_members.id"), nullable=False, index=True)
+    doc_type = Column(String, default="other")  # medical_certificate | other
+    filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    content_base64 = Column(Text, nullable=False)
+    uploaded_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    member = relationship("GymMember")
+
+
+class GymTrophy(Base):
+    """Trofeo/riconoscimento vinto da un socio in una gara o competizione, usato
+    per calcolare la classifica sociale del club (vedi GET /gym/leaderboard)."""
+    __tablename__ = "gym_trophies"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    member_id = Column(String, ForeignKey("gym_members.id"), nullable=False, index=True)
+    title = Column(String, nullable=False)  # es. "Campionato Regionale Karate"
+    placement = Column(String, nullable=True)  # es. "1° posto", "Oro"
+    points = Column(Integer, default=0)  # peso opzionale per la classifica (0 = non pesato, si conta solo il numero)
+    date_won = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    member = relationship("GymMember")
+
+
 # ---------- Moduli di settore "generici" (Fase 9.3) ----------
 class SectorRecordStatus(str, enum.Enum):
     aperto = "aperto"
