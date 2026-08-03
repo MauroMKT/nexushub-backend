@@ -14,7 +14,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey,
+from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, Float, ForeignKey,
                          Integer, String, Table, Text)
 from sqlalchemy.orm import relationship
 
@@ -706,6 +706,7 @@ class GymMember(Base):
     phone = Column(String, nullable=False)
     email = Column(String, nullable=False)
     address = Column(String, nullable=False)
+    birth_date = Column(Date, nullable=True)  # data di nascita, opzionale: abilita il promemoria compleanno
     fiscal_code = Column(String, nullable=True)  # codice fiscale, opzionale
     vat_number = Column(String, nullable=True)  # partita IVA, opzionale (es. personal trainer con P.IVA)
     card_number = Column(String, nullable=True)  # numero tessera del club

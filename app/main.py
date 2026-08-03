@@ -54,6 +54,8 @@ _TENANT_COLUMN_MIGRATIONS = [
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS smtp_use_tls BOOLEAN DEFAULT TRUE",
     "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'draft'",
     "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS failed_count INTEGER DEFAULT 0",
+    # Fase 9.10: data di nascita del socio palestra, per il promemoria compleanno.
+    "ALTER TABLE gym_members ADD COLUMN IF NOT EXISTS birth_date DATE",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:

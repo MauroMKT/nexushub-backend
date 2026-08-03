@@ -1,6 +1,6 @@
 """Schemi Pydantic (request/response) per l'API Fase 1."""
 import json as _json
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
@@ -1240,6 +1240,7 @@ class GymMemberCreate(BaseModel):
     phone: str
     email: EmailStr
     address: str
+    birth_date: Optional[date] = None
     fiscal_code: Optional[str] = None
     vat_number: Optional[str] = None
     card_number: Optional[str] = None
@@ -1255,6 +1256,7 @@ class GymMemberUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
+    birth_date: Optional[date] = None
     fiscal_code: Optional[str] = None
     vat_number: Optional[str] = None
     card_number: Optional[str] = None
@@ -1271,6 +1273,7 @@ class GymMemberOut(BaseModel):
     phone: str
     email: str
     address: str
+    birth_date: Optional[date] = None
     fiscal_code: Optional[str] = None
     vat_number: Optional[str] = None
     card_number: Optional[str] = None
@@ -1355,6 +1358,20 @@ class GymLeaderboardEntryOut(BaseModel):
     has_photo: bool = False
     trophies_count: int
     total_points: int
+
+
+class GymBirthdayEntryOut(BaseModel):
+    """Riga della lista compleanni in arrivo: prossima ricorrenza calcolata
+    lato server, con età che il socio compirà ed eventuale notifica già inviata oggi."""
+    member_id: str
+    full_name: str
+    card_number: Optional[str] = None
+    has_photo: bool = False
+    birth_date: date
+    next_birthday: date
+    days_until: int
+    turning_age: int
+    notified_today: bool = False
 
 
 # ---------- Moduli di settore "generici" (Fase 9.3) ----------
