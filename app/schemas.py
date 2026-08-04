@@ -1,7 +1,7 @@
 """Schemi Pydantic (request/response) per l'API Fase 1."""
 import json as _json
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -1016,13 +1016,15 @@ class ModulePublicCatalogItem(BaseModel):
     sector_group_ar: Optional[str] = None
 
 
-# ---------- Moduli pilota con funzionalità dedicata (Fase 9.1) ----------
+# ---------- Moduli pilota con funzionalità dedicata (Fase 9.1, estesi in Fase 9.16) ----------
 class EngineeringProjectCreate(BaseModel):
     title: str
     client_id: Optional[str] = None
     phase: str = "progettazione"
     deadline: Optional[datetime] = None
     budget: float = 0
+    budget_actual: float = 0
+    assigned_to: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -1032,6 +1034,8 @@ class EngineeringProjectUpdate(BaseModel):
     phase: Optional[str] = None
     deadline: Optional[datetime] = None
     budget: Optional[float] = None
+    budget_actual: Optional[float] = None
+    assigned_to: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -1043,8 +1047,44 @@ class EngineeringProjectOut(BaseModel):
     phase: str
     deadline: Optional[datetime]
     budget: float
+    budget_actual: float = 0
+    budget_remaining: float = 0
+    over_budget: bool = False
+    assigned_to: Optional[str] = None
     notes: Optional[str]
+    document_count: int = 0
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EngineeringProjectDocumentCreate(BaseModel):
+    filename: str
+    content_type: str
+    content_base64: str
+
+
+class EngineeringProjectDocumentOut(BaseModel):
+    id: str
+    project_id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EngineeringProjectDocumentContentOut(EngineeringProjectDocumentOut):
+    content_base64: str
+
+
+class EngineeringProjectPhaseLogOut(BaseModel):
+    id: str
+    phase: str
+    changed_at: datetime
 
     class Config:
         from_attributes = True
@@ -1082,11 +1122,84 @@ class AgencyProjectOut(BaseModel):
     retainer_monthly: Optional[float]
     hours_budget: Optional[float]
     hours_logged: float
+    hours_remaining: Optional[float] = None
+    over_budget: bool = False
+    milestone_count: int = 0
+    document_count: int = 0
     notes: Optional[str]
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class AgencyProjectMilestoneCreate(BaseModel):
+    title: str
+    due_date: Optional[datetime] = None
+    status: str = "da_fare"
+    notes: Optional[str] = None
+
+
+class AgencyProjectMilestoneUpdate(BaseModel):
+    title: Optional[str] = None
+    due_date: Optional[datetime] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class AgencyProjectMilestoneOut(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    due_date: Optional[datetime]
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AgencyTimeEntryCreate(BaseModel):
+    member_label: Optional[str] = None
+    hours: float
+    entry_date: Optional[datetime] = None
+    description: Optional[str] = None
+
+
+class AgencyTimeEntryOut(BaseModel):
+    id: str
+    project_id: str
+    member_label: Optional[str]
+    hours: float
+    entry_date: datetime
+    description: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AgencyProjectDocumentCreate(BaseModel):
+    filename: str
+    content_type: str
+    content_base64: str
+
+
+class AgencyProjectDocumentOut(BaseModel):
+    id: str
+    project_id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AgencyProjectDocumentContentOut(AgencyProjectDocumentOut):
+    content_base64: str
 
 
 class RealEstatePropertyCreate(BaseModel):
@@ -1276,6 +1389,128 @@ class MenuItemOut(BaseModel):
         from_attributes = True
 
 
+# ---------- Estensione POS Ristorante (Fase 9.15) ----------
+class HospitalityProfileOut(BaseModel):
+    business_type: str = "ristorante"
+
+    class Config:
+        from_attributes = True
+
+
+class HospitalityProfileUpdate(BaseModel):
+    business_type: str
+
+
+class RestaurantTableCreate(BaseModel):
+    label: str
+    seats: int = 2
+    pos_x: float = 10
+    pos_y: float = 10
+
+
+class RestaurantTableUpdate(BaseModel):
+    label: Optional[str] = None
+    seats: Optional[int] = None
+    pos_x: Optional[float] = None
+    pos_y: Optional[float] = None
+
+
+class RestaurantTableOut(BaseModel):
+    id: str
+    label: str
+    seats: int
+    pos_x: float
+    pos_y: float
+    # Calcolati lato router, non colonne dirette: derivano dagli ordini non
+    # ancora fatturati collegati al tavolo, così non serve tenerli sincronizzati.
+    occupied: bool = False
+    open_order_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class KitchenOrderItemCreate(BaseModel):
+    menu_item_id: Optional[str] = None
+    name: Optional[str] = None  # obbligatorio se menu_item_id non è indicato
+    quantity: int = 1
+    notes: Optional[str] = None
+
+
+class KitchenOrderItemOut(BaseModel):
+    id: str
+    menu_item_id: Optional[str]
+    name: str
+    unit_price: float
+    quantity: int
+    notes: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class KitchenOrderCreate(BaseModel):
+    order_type: str = "tavolo"  # tavolo | asporto | delivery
+    table_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    delivery_address: Optional[str] = None
+    notes: Optional[str] = None
+    items: List[KitchenOrderItemCreate] = []
+
+
+class KitchenOrderStatusUpdate(BaseModel):
+    status: str
+
+
+class KitchenOrderOut(BaseModel):
+    id: str
+    table_id: Optional[str]
+    table_label: Optional[str] = None
+    order_type: str
+    status: str
+    customer_name: Optional[str]
+    customer_phone: Optional[str]
+    delivery_address: Optional[str]
+    notes: Optional[str]
+    billed: bool = False
+    items: List[KitchenOrderItemOut] = []
+    total: float = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BillPreviewOut(BaseModel):
+    table_id: Optional[str]
+    table_label: Optional[str] = None
+    orders: List[KitchenOrderOut] = []
+    subtotal: float = 0
+
+
+class BillCloseRequest(BaseModel):
+    discount: float = 0
+    payment_method: str = "contanti"
+
+
+class BillOut(BaseModel):
+    id: str
+    table_id: Optional[str]
+    table_label: Optional[str] = None
+    subtotal: float
+    discount: float
+    total: float
+    payment_method: Optional[str]
+    status: str
+    paid_at: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ---------- Modulo pilota: Palestre e Centri Sportivi (Fase 9.9) ----------
 class GymCourseCreate(BaseModel):
     name: str
@@ -1457,13 +1692,18 @@ class GymBirthdayEntryOut(BaseModel):
     notified_today: bool = False
 
 
-# ---------- Moduli di settore "generici" (Fase 9.3) ----------
+# ---------- Moduli di settore "generici" (Fase 9.3, estesi in Fase 9.16) ----------
 class SectorRecordCreate(BaseModel):
     title: str
     client_id: Optional[str] = None
     status: str = "aperto"
     value: Optional[float] = None
     reference_date: Optional[datetime] = None
+    priority: str = "media"
+    due_date: Optional[datetime] = None
+    assigned_to: Optional[str] = None
+    tags: Optional[str] = None
+    custom_fields: Optional[Dict[str, str]] = None
     notes: Optional[str] = None
 
 
@@ -1473,6 +1713,11 @@ class SectorRecordUpdate(BaseModel):
     status: Optional[str] = None
     value: Optional[float] = None
     reference_date: Optional[datetime] = None
+    priority: Optional[str] = None
+    due_date: Optional[datetime] = None
+    assigned_to: Optional[str] = None
+    tags: Optional[str] = None
+    custom_fields: Optional[Dict[str, str]] = None
     notes: Optional[str] = None
 
 
@@ -1485,8 +1730,36 @@ class SectorRecordOut(BaseModel):
     status: str
     value: Optional[float]
     reference_date: Optional[datetime]
+    priority: str = "media"
+    due_date: Optional[datetime] = None
+    assigned_to: Optional[str] = None
+    tags: Optional[str] = None
+    custom_fields: Optional[Dict[str, str]] = None
+    document_count: int = 0
     notes: Optional[str]
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class SectorRecordDocumentCreate(BaseModel):
+    filename: str
+    content_type: str
+    content_base64: str
+
+
+class SectorRecordDocumentOut(BaseModel):
+    id: str
+    record_id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SectorRecordDocumentContentOut(SectorRecordDocumentOut):
+    content_base64: str

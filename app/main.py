@@ -69,6 +69,16 @@ _TENANT_COLUMN_MIGRATIONS = [
     "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS visit_availability TEXT",
     "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS rent_to_own BOOLEAN DEFAULT FALSE",
     "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS video_url VARCHAR",
+    # Fase 9.16: potenziamento moduli restanti — commesse ingegneria con budget
+    # a consuntivo e referente, elementi di settore generici con priorità,
+    # scadenza, assegnatario, tag e campi personalizzati liberi.
+    "ALTER TABLE engineering_projects ADD COLUMN IF NOT EXISTS budget_actual FLOAT DEFAULT 0",
+    "ALTER TABLE engineering_projects ADD COLUMN IF NOT EXISTS assigned_to VARCHAR",
+    "ALTER TABLE sector_records ADD COLUMN IF NOT EXISTS priority VARCHAR DEFAULT 'media'",
+    "ALTER TABLE sector_records ADD COLUMN IF NOT EXISTS due_date TIMESTAMP",
+    "ALTER TABLE sector_records ADD COLUMN IF NOT EXISTS assigned_to VARCHAR",
+    "ALTER TABLE sector_records ADD COLUMN IF NOT EXISTS tags VARCHAR",
+    "ALTER TABLE sector_records ADD COLUMN IF NOT EXISTS custom_fields TEXT",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:
