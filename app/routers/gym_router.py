@@ -23,8 +23,8 @@ router = APIRouter(prefix="/gym", tags=["Palestre e Centri Sportivi"])
 
 _require = require_module("palestre")
 
-MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
-MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB, coerente con client_documents_router.py
+MAX_PHOTO_SIZE_BYTES = 12 * 1024 * 1024  # 12 MB: una foto scattata da smartphone moderno pesa spesso 4-10 MB
+MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB: un certificato medico scansionato multi-pagina può superare i 10 MB
 
 # Il certificato medico deve essere un PDF o una foto (richiesta esplicita):
 # niente Word/Excel/altri formati che poi nessuno riesce ad aprire in ambulatorio.
