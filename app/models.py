@@ -633,7 +633,8 @@ class AgencyProject(Base):
 
 
 class RealEstateProperty(Base):
-    """Immobile in portafoglio del modulo "Agenzie Immobiliari" (Fase 9.1)."""
+    """Immobile in portafoglio del modulo "Agenzie Immobiliari" (Fase 9.1,
+    esteso in Fase 9.13 con dettagli immobile, tipo contratto e riscatto)."""
     __tablename__ = "real_estate_properties"
 
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -642,14 +643,62 @@ class RealEstateProperty(Base):
     title = Column(String, nullable=False)
     property_type = Column(String, default="residenziale")  # residenziale | commerciale | terreno | garage | altro
     address = Column(String, nullable=True)
+    city = Column(String, nullable=True)  # Fase 9.13: città dell'immobile
     size_sqm = Column(Float, nullable=True)
+    rooms = Column(Integer, nullable=True)  # Fase 9.13: numero camere
+    bathrooms = Column(Integer, nullable=True)  # Fase 9.13: numero bagni
+    # Testo libero (non solo numero) per coprire notazioni come "T", "PT", "S1", "Attico".
+    building_floor = Column(String, nullable=True)  # Fase 9.13: piano dell'edificio
+    unit_floor = Column(String, nullable=True)  # Fase 9.13: piano dell'appartamento/unità
+    contract_type = Column(String, default="vendita")  # Fase 9.13: vendita | locazione
     price = Column(Float, nullable=True)
+    valuation_price = Column(Float, nullable=True)  # Fase 9.13: prezzo di valutazione/perizia
     status = Column(String, default="disponibile")  # disponibile | in_trattativa | venduto | affittato
+    # Stato/condizione fisica dell'immobile: nuovo | ottimo | buono | da_ristrutturare | ristrutturato.
+    # Campo distinto da "status" (che indica lo stato della trattativa, non le condizioni dell'immobile).
+    condition_state = Column(String, nullable=True)  # Fase 9.13
+    visit_availability = Column(Text, nullable=True)  # Fase 9.13: preferenza giorni/orari di visita
+    # Disponibilità a vendita a riscatto (locali commerciali) o affitto con riscatto (residenziale):
+    # un solo campo booleano, l'etichetta mostrata in UI cambia in base a property_type.
+    rent_to_own = Column(Boolean, default=False)  # Fase 9.13
+    video_url = Column(String, nullable=True)  # Fase 9.13: link a video esterno (tour, tessera reel, ecc.)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     client = relationship("Client")
+
+
+class RealEstatePhoto(Base):
+    """Galleria foto di un immobile (Fase 9.13). Stesso pattern base64-in-DB
+    già usato per GymDocument: nessun filesystem esterno persistente su Railway."""
+    __tablename__ = "real_estate_photos"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    property_id = Column(String, ForeignKey("real_estate_properties.id"), nullable=False, index=True)
+    content_type = Column(String, nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    content_base64 = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class RealEstateDocument(Base):
+    """Documenti e video dell'immobile (Fase 9.13): planimetrie, atti, APE, video
+    di presentazione. doc_type distingue "documento" da "video" per applicare
+    limiti di dimensione diversi lato router."""
+    __tablename__ = "real_estate_documents"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
+    property_id = Column(String, ForeignKey("real_estate_properties.id"), nullable=False, index=True)
+    doc_type = Column(String, default="documento")  # documento | video
+    filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    content_base64 = Column(Text, nullable=False)
+    uploaded_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Reservation(Base):

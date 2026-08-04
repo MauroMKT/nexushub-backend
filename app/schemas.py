@@ -1094,9 +1094,20 @@ class RealEstatePropertyCreate(BaseModel):
     client_id: Optional[str] = None
     property_type: str = "residenziale"
     address: Optional[str] = None
+    city: Optional[str] = None
     size_sqm: Optional[float] = None
+    rooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    building_floor: Optional[str] = None
+    unit_floor: Optional[str] = None
+    contract_type: str = "vendita"
     price: Optional[float] = None
+    valuation_price: Optional[float] = None
     status: str = "disponibile"
+    condition_state: Optional[str] = None
+    visit_availability: Optional[str] = None
+    rent_to_own: bool = False
+    video_url: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -1105,9 +1116,20 @@ class RealEstatePropertyUpdate(BaseModel):
     client_id: Optional[str] = None
     property_type: Optional[str] = None
     address: Optional[str] = None
+    city: Optional[str] = None
     size_sqm: Optional[float] = None
+    rooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    building_floor: Optional[str] = None
+    unit_floor: Optional[str] = None
+    contract_type: Optional[str] = None
     price: Optional[float] = None
+    valuation_price: Optional[float] = None
     status: Optional[str] = None
+    condition_state: Optional[str] = None
+    visit_availability: Optional[str] = None
+    rent_to_own: Optional[bool] = None
+    video_url: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -1118,14 +1140,75 @@ class RealEstatePropertyOut(BaseModel):
     client_name: Optional[str] = None
     property_type: str
     address: Optional[str]
+    city: Optional[str] = None
     size_sqm: Optional[float]
+    rooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    building_floor: Optional[str] = None
+    unit_floor: Optional[str] = None
+    contract_type: str = "vendita"
     price: Optional[float]
+    valuation_price: Optional[float] = None
     status: str
+    condition_state: Optional[str] = None
+    visit_availability: Optional[str] = None
+    rent_to_own: bool = False
+    video_url: Optional[str] = None
+    photo_count: int = 0
     notes: Optional[str]
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class RealEstatePhotoUpload(BaseModel):
+    content_type: str
+    content_base64: str
+
+
+class RealEstatePhotoOut(BaseModel):
+    id: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RealEstatePhotoContentOut(BaseModel):
+    id: str
+    content_type: str
+    content_base64: str
+
+
+class RealEstateDocumentCreate(BaseModel):
+    doc_type: str = "documento"  # documento | video
+    filename: str
+    content_type: str
+    content_base64: str
+
+
+class RealEstateDocumentOut(BaseModel):
+    id: str
+    property_id: str
+    doc_type: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_by_name: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RealEstateDocumentContentOut(BaseModel):
+    id: str
+    filename: str
+    content_type: str
+    content_base64: str
 
 
 class ReservationCreate(BaseModel):

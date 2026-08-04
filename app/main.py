@@ -56,6 +56,19 @@ _TENANT_COLUMN_MIGRATIONS = [
     "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS failed_count INTEGER DEFAULT 0",
     # Fase 9.10: data di nascita del socio palestra, per il promemoria compleanno.
     "ALTER TABLE gym_members ADD COLUMN IF NOT EXISTS birth_date DATE",
+    # Fase 9.13: estensione modulo Agenzie Immobiliari con dettagli immobile,
+    # tipo contratto, prezzo di valutazione, stato immobile e riscatto.
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS city VARCHAR",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS rooms INTEGER",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS bathrooms INTEGER",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS building_floor VARCHAR",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS unit_floor VARCHAR",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS contract_type VARCHAR DEFAULT 'vendita'",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS valuation_price FLOAT",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS condition_state VARCHAR",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS visit_availability TEXT",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS rent_to_own BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE real_estate_properties ADD COLUMN IF NOT EXISTS video_url VARCHAR",
 ]
 for _stmt in _TENANT_COLUMN_MIGRATIONS:
     try:
