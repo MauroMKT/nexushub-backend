@@ -594,8 +594,7 @@ class EngineeringProjectPhase(str, enum.Enum):
 
 
 class EngineeringProject(Base):
-    """Commessa tecnica del modulo "Servizi di Ingegneria" (Fase 9.1, estesa in
-    Fase 9.16 con documenti/permessi, budget a consuntivo e storico fasi)."""
+    """Commessa tecnica del modulo "Servizi di Ingegneria" (Fase 9.1)."""
     __tablename__ = "engineering_projects"
 
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -605,8 +604,6 @@ class EngineeringProject(Base):
     phase = Column(Enum(EngineeringProjectPhase), default=EngineeringProjectPhase.progettazione)
     deadline = Column(DateTime, nullable=True)
     budget = Column(Float, default=0)
-    budget_actual = Column(Float, default=0)  # Fase 9.16: spesa a consuntivo
-    assigned_to = Column(String, nullable=True)  # Fase 9.16: referente tecnico/team incaricato
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -614,39 +611,9 @@ class EngineeringProject(Base):
     client = relationship("Client")
 
 
-class EngineeringProjectDocument(Base):
-    """Documenti e permessi della commessa (Fase 9.16): elaborati, autorizzazioni,
-    certificati di collaudo. Stesso pattern base64-in-DB già usato altrove."""
-    __tablename__ = "engineering_project_documents"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    project_id = Column(String, ForeignKey("engineering_projects.id"), nullable=False, index=True)
-    filename = Column(String, nullable=False)
-    content_type = Column(String, nullable=False)
-    size_bytes = Column(Integer, nullable=False)
-    content_base64 = Column(Text, nullable=False)
-    uploaded_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class EngineeringProjectPhaseLog(Base):
-    """Storico dei cambi fase di una commessa (Fase 9.16): traccia quando il
-    progetto è passato da progettazione a permessi, da permessi a esecuzione,
-    ecc., per ricostruire una timeline verificabile."""
-    __tablename__ = "engineering_project_phase_logs"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    project_id = Column(String, ForeignKey("engineering_projects.id"), nullable=False, index=True)
-    phase = Column(String, nullable=False)
-    changed_at = Column(DateTime, default=datetime.utcnow)
-
-
 class AgencyProject(Base):
-    """Progetto cliente del modulo "Servizi IT & Marketing" (Fase 9.1, esteso in
-    Fase 9.16 con milestone, time tracking reale e documenti/deliverable): stato
-    ed eventuale retainer mensile e monte ore, per agenzie di marketing o IT."""
+    """Progetto cliente del modulo "Servizi IT & Marketing" (Fase 9.1): milestone,
+    stato ed eventuale retainer mensile e monte ore, per agenzie di marketing o IT."""
     __tablename__ = "agency_projects"
 
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -663,53 +630,6 @@ class AgencyProject(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     client = relationship("Client")
-
-
-class AgencyProjectMilestone(Base):
-    """Milestone di un progetto agenzia (Fase 9.16): consegne intermedie con
-    scadenza e stato, per scomporre il progetto in step verificabili."""
-    __tablename__ = "agency_project_milestones"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    project_id = Column(String, ForeignKey("agency_projects.id"), nullable=False, index=True)
-    title = Column(String, nullable=False)
-    due_date = Column(DateTime, nullable=True)
-    status = Column(String, default="da_fare")  # da_fare | in_corso | completato
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class AgencyTimeEntry(Base):
-    """Voce di rendicontazione ore su un progetto agenzia (Fase 9.16): sostituisce
-    il solo contatore manuale hours_logged con un log dettagliato, così il monte
-    ore del retainer è calcolato dalle voci reali invece che da un numero libero."""
-    __tablename__ = "agency_time_entries"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    project_id = Column(String, ForeignKey("agency_projects.id"), nullable=False, index=True)
-    member_label = Column(String, nullable=True)  # nome libero di chi ha svolto il lavoro
-    hours = Column(Float, nullable=False)
-    entry_date = Column(DateTime, default=datetime.utcnow)
-    description = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class AgencyProjectDocument(Base):
-    """Documenti/deliverable di un progetto agenzia (Fase 9.16): brief, contratti,
-    file consegnati al cliente. Stesso pattern base64-in-DB già usato altrove."""
-    __tablename__ = "agency_project_documents"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    project_id = Column(String, ForeignKey("agency_projects.id"), nullable=False, index=True)
-    filename = Column(String, nullable=False)
-    content_type = Column(String, nullable=False)
-    size_bytes = Column(Integer, nullable=False)
-    content_base64 = Column(Text, nullable=False)
-    uploaded_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class RealEstateProperty(Base):
@@ -813,101 +733,6 @@ class MenuItem(Base):
     description = Column(Text, nullable=True)
     is_available = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-
-# ---------- Estensione POS Ristorante (Fase 9.15) ----------
-# I 4 slug "ristorazione"/"bar_bistrot"/"locali_notturni"/"hotel" condividono
-# già hospitality_router.py e la pagina /hospitality (vedi modules_catalog.py,
-# DEDICATED_ROUTES). Qui aggiungiamo mappa tavoli, comande cucina/delivery/
-# asporto e gestione conto per la parte "ristorante"; HospitalityProfile
-# decide quale set di funzionalità mostrare (ristorante vs hotel) tramite un
-# menu a tendina lato utente, indipendentemente da quale dei 4 slug è attivo.
-
-class HospitalityProfile(Base):
-    """Impostazione per tenant: tipo di attività (ristorante o hotel), scelta
-    dall'utente con un menu a tendina. Determina quali tab mostra la pagina
-    (tavoli/cucina/delivery/ordini/conto per i ristoranti, solo prenotazioni
-    camere + menu per gli hotel). Una riga per tenant."""
-    __tablename__ = "hospitality_profiles"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, unique=True, index=True)
-    business_type = Column(String, default="ristorante")  # ristorante | hotel
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-class RestaurantTable(Base):
-    """Tavolo sulla mappa della sala. pos_x/pos_y sono percentuali (0-100)
-    della pianta, così la mappa resta coerente su schermi di dimensioni
-    diverse senza bisogno di coordinate assolute in pixel."""
-    __tablename__ = "restaurant_tables"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    label = Column(String, nullable=False)  # es. "Tavolo 5"
-    seats = Column(Integer, default=2)
-    pos_x = Column(Float, default=10)
-    pos_y = Column(Float, default=10)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class KitchenOrder(Base):
-    """Comanda: al tavolo, asporto o delivery. Lo stato è il flusso che segue
-    la cucina (in_attesa -> in_preparazione -> pronto -> consegnato), lo stesso
-    per tutti e tre i canali così un'unica schermata "Cucina" li gestisce
-    tutti insieme. billed=True quando è stata inclusa in un conto chiuso."""
-    __tablename__ = "kitchen_orders"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    table_id = Column(String, ForeignKey("restaurant_tables.id"), nullable=True)  # solo per order_type="tavolo"
-    order_type = Column(String, default="tavolo")  # tavolo | asporto | delivery
-    status = Column(String, default="in_attesa")  # in_attesa | in_preparazione | pronto | consegnato | annullato
-    customer_name = Column(String, nullable=True)  # asporto/delivery
-    customer_phone = Column(String, nullable=True)
-    delivery_address = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
-    bill_id = Column(String, ForeignKey("bills.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    table = relationship("RestaurantTable")
-    items = relationship("KitchenOrderItem", backref="order", cascade="all, delete-orphan")
-
-
-class KitchenOrderItem(Base):
-    """Riga di comanda. name/unit_price sono uno scatto ("snapshot") del piatto
-    al momento dell'ordine: se il prezzo del menu cambia dopo, i conti già
-    emessi restano corretti storicamente."""
-    __tablename__ = "kitchen_order_items"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    order_id = Column(String, ForeignKey("kitchen_orders.id"), nullable=False, index=True)
-    menu_item_id = Column(String, ForeignKey("menu_items.id"), nullable=True)
-    name = Column(String, nullable=False)
-    unit_price = Column(Float, default=0)
-    quantity = Column(Integer, default=1)
-    notes = Column(Text, nullable=True)
-
-
-class Bill(Base):
-    """Conto: chiude uno o più ordini non ancora fatturati per un tavolo (o per
-    un asporto/delivery), calcolando il totale dagli item snapshot al momento
-    dell'ordine. Una volta chiuso il tavolo torna libero."""
-    __tablename__ = "bills"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    table_id = Column(String, ForeignKey("restaurant_tables.id"), nullable=True)
-    subtotal = Column(Float, default=0)
-    discount = Column(Float, default=0)
-    total = Column(Float, default=0)
-    payment_method = Column(String, nullable=True)  # contanti | carta | altro
-    status = Column(String, default="aperto")  # aperto | pagato
-    paid_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    table = relationship("RestaurantTable")
 
 
 # ---------- Modulo pilota: Palestre e Centri Sportivi (Fase 9.9) ----------
@@ -1026,23 +851,14 @@ class SectorRecordStatus(str, enum.Enum):
     chiuso = "chiuso"
 
 
-class SectorRecordPriority(str, enum.Enum):
-    bassa = "bassa"
-    media = "media"
-    alta = "alta"
-
-
 class SectorRecord(Base):
     """Elemento di lavoro generico per i settori del catalogo SENZA uno schema
-    dati bespoke (a differenza dei moduli pilota, che hanno ciascuno la propria
-    tabella). Un'unica tabella parametrizzata da module_slug copre tutti gli
-    altri ~17 settori (studi legali, officine, ecc.): l'etichetta mostrata in
-    UI per "title" cambia per settore tramite record_label_it/en in
-    modules_catalog.py, ma la struttura dati e gli endpoint
-    (sector_records_router.py) restano condivisi. Estesa in Fase 9.16 con
-    priorità, scadenza, assegnatario, tag, campi personalizzati liberi e
-    documenti allegati, così da innalzare in un colpo solo il livello di
-    dettaglio disponibile per tutti i settori generici."""
+    dati bespoke (a differenza dei 4 moduli pilota di Fase 9.1, che hanno
+    ciascuno la propria tabella). Un'unica tabella parametrizzata da
+    module_slug copre tutti gli altri ~18 settori (studi legali, officine,
+    palestre, ecc.): l'etichetta mostrata in UI per "title" cambia per settore
+    tramite record_label_it/en in modules_catalog.py, ma la struttura dati e
+    gli endpoint (sector_records_router.py) restano condivisi."""
     __tablename__ = "sector_records"
 
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -1053,33 +869,8 @@ class SectorRecord(Base):
     status = Column(Enum(SectorRecordStatus), default=SectorRecordStatus.aperto)
     value = Column(Float, nullable=True)
     reference_date = Column(DateTime, nullable=True)
-    priority = Column(Enum(SectorRecordPriority), default=SectorRecordPriority.media)  # Fase 9.16
-    due_date = Column(DateTime, nullable=True)  # Fase 9.16: scadenza/promemoria
-    assigned_to = Column(String, nullable=True)  # Fase 9.16: referente incaricato (testo libero)
-    tags = Column(String, nullable=True)  # Fase 9.16: tag separati da virgola
-    # Campi personalizzati liberi per settore, salvati come JSON serializzato in
-    # una stringa: evita di dover creare una tabella per ognuno dei 17 settori
-    # generici pur permettendo a ciascun tenant di tracciare dati specifici
-    # (es. "targa" per un'officina, "numero pratica" per uno studio legale).
-    custom_fields = Column(Text, nullable=True)  # Fase 9.16: JSON {"chiave": "valore"}
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     client = relationship("Client")
-
-
-class SectorRecordDocument(Base):
-    """Documento allegato a un elemento generico di settore (Fase 9.16). Stesso
-    pattern base64-in-DB già usato altrove nel progetto."""
-    __tablename__ = "sector_record_documents"
-
-    id = Column(String, primary_key=True, default=gen_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, index=True)
-    record_id = Column(String, ForeignKey("sector_records.id"), nullable=False, index=True)
-    filename = Column(String, nullable=False)
-    content_type = Column(String, nullable=False)
-    size_bytes = Column(Integer, nullable=False)
-    content_base64 = Column(Text, nullable=False)
-    uploaded_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)

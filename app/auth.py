@@ -68,24 +68,29 @@ def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: 
         if tenant is None or not tenant.is_active:
             raise HTTPException(status_code=403, detail="Account sospeso: contatta l'assistenza")
 
-    # Modalità "visualizza come super admin": il super admin resta autenticato
-    # con la PROPRIA identità (id, email, ruolo) ma ogni endpoint che filtra per
-    # tenant_id dell'utente corrente vede i dati del tenant scelto, grazie
-    # all'header X-View-Tenant-Id inviato dal frontend quando è attiva la
-    # modalità "Entra come" dal pannello Super Admin. Non genera mai un token
-    # separato e non fa mai il login con le credenziali dell'iscritto: è
-    # l'esatto opposto del vecchio /platform-admin/tenants/{id}/impersonate,
-    # rimosso proprio perché avrebbe fatto "diventare" il super admin l'utente
-    # del tenant. db.expunge stacca l'oggetto dalla sessione PRIMA di mutarlo,
-    # così questa sovrascrittura resta solo in memoria per questa richiesta e
-    # non può mai essere scritta per errore sul record reale dell'utente.
+    # Modalità "Entra come Super Admin" (Fase 7 rivista): il super admin resta
+    # SEMPRE autenticato con il proprio account/token, non fa mai un login con
+    # le credenziali dell'iscritto. Se la richiesta porta l'header
+    # X-View-Tenant-Id (impostato dal frontend solo quando il super admin sta
+    # "visualizzando" un'agenzia cliente), reinterpretiamo la richiesta come se
+    # il tenant_id dell'utente fosse quello del tenant selezionato — SOLO in
+    # memoria per questa singola richiesta, mai scritto sul database.
+    #
+    # db.expunge(user) stacca l'oggetto dalla sessione PRIMA di mutarlo: senza
+    # questo, un qualsiasi db.commit() successivo nella stessa richiesta (anche
+    # per logica di business non collegata) rischierebbe di persistere per
+    # errore il tenant_id finto sull'account reale del super admin.
     if user.role == models.RoleEnum.platform_admin:
-        view_tenant_id = request.headers.get("x-view-tenant-id")
+        view_tenant_id = request.headers.get("X-View-Tenant-Id")
         if view_tenant_id:
             target_tenant = db.query(models.Tenant).filter(models.Tenant.id == view_tenant_id).first()
-            if target_tenant and target_tenant.slug != "_platform":
+            if target_tenant is not None:
                 db.expunge(user)
                 user.tenant_id = target_tenant.id
+                # Assegniamo anche la relationship già caricata in memoria: dopo
+                # l'expunge, un accesso lazy a user.tenant (es. whatsapp_router.py)
+                # solleverebbe DetachedInstanceError perché l'oggetto non è più
+                # agganciato alla sessione.
                 user.tenant = target_tenant
 
     return user
