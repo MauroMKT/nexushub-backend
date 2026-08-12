@@ -28,6 +28,16 @@ from collections import defaultdict
 # valida come chiave di confronto SOLO una stringa nel formato email vero.
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Coppie di schede che NON vanno mai unite anche se condividono email/telefono/nome,
+# perché una revisione manuale ha stabilito che sono entità distinte. Ogni voce è
+# l'insieme dei due id record. Aggiungere qui altre coppie se emergono altri casi
+# da tenere separati.
+EXCLUDED_MERGE_PAIRS = {
+    # 'SS Lazio Marketing & Communication SpA' vs 'Groupama Assicurazioni':
+    # condividono l'email mktcomm@sslazio.it ma sono aziende diverse — da tenere separate.
+    frozenset({"403c31dd-e1fb-4807-8568-12033c5fe7f8", "1823b4b6-0451-4f62-8f07-561733121fad"}),
+}
+
 
 def normalize_email(email):
     if not email:
@@ -75,13 +85,19 @@ class UnionFind:
             self.parent[ra] = rb
 
 
-def build_groups(records, key_fns):
+def build_groups(records, key_fns, excluded_pairs=None):
     """
-    records: lista di dict con almeno i campi usati da key_fns.
+    records: lista di dict con almeno i campi usati da key_fns (e "id").
     key_fns: lista di funzioni record -> chiave normalizzata (o None).
+    excluded_pairs: insieme di frozenset({id1, id2}) che non vanno mai unite,
+        anche se condividono una chiave (es. revisione manuale che ha stabilito
+        che sono entità distinte). Default: EXCLUDED_MERGE_PAIRS.
     Ritorna: lista di gruppi (ognuno lista di record), solo gruppi con 2+ elementi.
     """
+    if excluded_pairs is None:
+        excluded_pairs = EXCLUDED_MERGE_PAIRS
     n = len(records)
+    ids = [r.get("id") for r in records]
     uf = UnionFind(n)
     for key_fn in key_fns:
         buckets = defaultdict(list)
@@ -91,8 +107,12 @@ def build_groups(records, key_fns):
                 buckets[k].append(i)
         for idxs in buckets.values():
             if len(idxs) > 1:
+                base = idxs[0]
                 for i in idxs[1:]:
-                    uf.union(idxs[0], i)
+                    pair = frozenset({ids[base], ids[i]})
+                    if pair in excluded_pairs:
+                        continue
+                    uf.union(base, i)
 
     groups = defaultdict(list)
     for i, r in enumerate(records):
