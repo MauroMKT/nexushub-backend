@@ -20,12 +20,22 @@ piattaforma): non unisce mai dati tra tenant diversi.
 import re
 from collections import defaultdict
 
+# Una vera email ha sempre la forma testo@testo.testo. Molte schede hanno nel
+# campo email un promemoria testuale invece di una email vera (es. "verificare
+# sito", "verificare email", "form sito", "da cercare su LinkedIn"...). Se questi
+# testi identici venissero considerati "stessa email", schede di aziende/persone
+# completamente diverse verrebbero unite per errore. Per questo consideriamo
+# valida come chiave di confronto SOLO una stringa nel formato email vero.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 def normalize_email(email):
     if not email:
         return None
     e = email.strip().lower()
-    return e if e else None
+    if not e or not _EMAIL_RE.match(e):
+        return None
+    return e
 
 
 def normalize_phone(phone):
